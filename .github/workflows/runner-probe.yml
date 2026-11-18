@@ -4,12 +4,17 @@ on:
   workflow_dispatch:
 
 jobs:
-  linux:
-    runs-on: ubuntu-latest
+  mac13:
+    runs-on: macos-13
     steps:
-      - run: uname -a
+      - run: uname -m && xcodebuild -version
 
-  mac:
-    runs-on: macos-14
+  mac15:
+    runs-on: macos-15
     steps:
-      - run: uname -a && xcodebuild -version
+      - run: uname -m && xcodebuild -version
+
+  maclatest:
+    runs-on: macos-latest
+    steps:
+      - run: uname -m && xcodebuild -version
