@@ -1,0 +1,15 @@
+{
+  "routes": [
+    {
+      "route": "/downloads/*.{apk,ipa}",
+      "headers": {
+        "Cache-Control": "no-store",
+        "Content-Disposition": "attachment"
+      }
+    }
+  ],
+  "mimeTypes": {
+    ".apk": "application/vnd.android.package-archive",
+    ".ipa": "application/octet-stream"
+  }
+}

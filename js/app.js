@@ -19,26 +19,115 @@
     more: ['☰', 'More', ''],
   };
   const BOTTOM = ['dashboard', 'transactions', 'debts', 'installments', 'more'];
+  const IOS_ICONS = {
+    dashboard: '<path d="M3 10.5 12 3l9 7.5M5.5 9.5V21h13V9.5M9.5 21v-6h5v6"/>',
+    transactions: '<path d="M5 4h14v16l-2.5-1.5L14 20l-2-1.5L9.5 20 7 18.5 5 20V4ZM8 8h8M8 12h8"/>',
+    debts: '<rect x="3" y="6" width="18" height="13" rx="2"/><path d="M3 10h18M7 15h4"/>',
+    installments: '<rect x="4" y="5" width="16" height="16" rx="2"/><path d="M8 3v4M16 3v4M4 10h16M8 14h3M8 17h3"/>',
+    more: '<circle cx="5" cy="12" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="19" cy="12" r="1.5"/>',
+  };
+  const EYE_ICON = '<path d="M2 12c2-4 5.5-7 10-7s8 3 10 7c-2 4-5.5 7-10 7s-8-3-10-7Z"/><circle cx="12" cy="12" r="3"/>';
+  const DISPLAY_ICONS = {
+    show: EYE_ICON,
+    hide: EYE_ICON + '<path d="M3 3l18 18"/>',
+    light: '<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/>',
+    dark: '<path d="M20 14.5A8 8 0 0 1 9.5 4 8 8 0 1 0 20 14.5Z"/>',
+  };
+  const displayIcon = (name) => `<svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">${DISPLAY_ICONS[name]}</svg>`;
+  const MONTHS = Array.from({ length: 12 }, (_, i) => new Date(2024, i, 1).toLocaleDateString('en-PH', { month: 'long' }));
   const route = () => { const r = location.hash.replace('#/', ''); return ROUTES[r] ? r : 'dashboard'; };
 
   /* ---------- Render ---------- */
+  function syncDisplaySettings() {
+    const { theme, privacy } = S().settings;
+    document.documentElement.dataset.theme = theme;
+    document.body.classList.toggle('privacy', !!privacy);
+    $('meta[name="theme-color"]').content = theme === 'dark' ? '#000000' : '#f4f7f5';
+    [['privacyBtn', privacy ? '👁 Show' : '🙈 Privacy'], ['iosPrivacyBtn', privacy ? 'Show' : 'Hide'], ['settingsPrivacyBtn', privacy ? 'Show' : 'Hide']].forEach(([id, text]) => {
+      const button = $('#' + id); if (!button) return;
+      if (id === 'iosPrivacyBtn') button.innerHTML = displayIcon(privacy ? 'show' : 'hide'); else button.textContent = text;
+      button.title = privacy ? 'Show amounts' : 'Hide amounts';
+      button.setAttribute('aria-label', button.title);
+      button.setAttribute('aria-pressed', String(!!privacy));
+    });
+    [['themeBtn', theme === 'dark' ? '☀️ Light' : '🌙 Dark'], ['iosThemeBtn', theme === 'dark' ? 'Light' : 'Dark'], ['settingsThemeBtn', theme === 'dark' ? 'Light' : 'Dark']].forEach(([id, text]) => {
+      const button = $('#' + id); if (!button) return;
+      if (id === 'iosThemeBtn') button.innerHTML = displayIcon(theme === 'dark' ? 'light' : 'dark'); else button.textContent = text;
+      button.title = theme === 'dark' ? 'Switch to light theme' : 'Switch to dark theme';
+      button.setAttribute('aria-label', button.title);
+      button.setAttribute('aria-pressed', String(theme === 'dark'));
+    });
+  }
+  function syncMonth() {
+    const label = UI.monthName(ui.ym);
+    $('#monthLabelText').textContent = label;
+    $('#monthLabel').setAttribute('aria-label', `Choose month, ${label}`);
+    $('#prevMonth').disabled = ui.ym === '1000-01';
+    $('#nextMonth').disabled = ui.ym === '9999-12';
+  }
   function render() {
     const r = route(), s = S();
-    document.documentElement.dataset.theme = s.settings.theme;
-    document.body.classList.toggle('privacy', !!s.settings.privacy);
+    const ios = document.documentElement.classList.contains('ios-app');
+    syncDisplaySettings();
     const lateCount = s.installments.filter((it) => Installments.stats(it).behind > 0).length;
-    $('#nav').innerHTML = Object.entries(ROUTES).filter(([k]) => k !== 'more').map(([k, [i, l]]) => `<a class="nav-link ${k === r ? 'active' : ''}" href="#/${k}"><span>${i}</span>${l}${k === 'installments' && lateCount ? ` <span class="badge bad" style="margin-left:auto">${lateCount}</span>` : ''}</a>`).join('');
-    $('#bottomNav').innerHTML = BOTTOM.map((k) => `<a class="${k === r || (k === 'more' && !BOTTOM.includes(r)) ? 'active' : ''}" href="#/${k}"><span>${ROUTES[k][0]}</span>${k === 'dashboard' ? 'Home' : ROUTES[k][1]}</a>`).join('');
+    $('#nav').innerHTML = Object.entries(ROUTES).filter(([k]) => k !== 'more').map(([k, [i, l]]) => `<a class="nav-link ${k === r ? 'active' : ''}" href="#/${k}"${k === r ? ' aria-current="page"' : ''}><span>${i}</span>${l}${k === 'installments' && lateCount ? ` <span class="badge bad" style="margin-left:auto">${lateCount}</span>` : ''}</a>`).join('');
+    $('#bottomNav').innerHTML = BOTTOM.map((k) => {
+      const active = k === r || (k === 'more' && !BOTTOM.includes(r));
+      const icon = ios ? `<svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">${IOS_ICONS[k]}</svg>` : `<span>${ROUTES[k][0]}</span>`;
+      return `<a class="${active ? 'active' : ''}" href="#/${k}"${active ? ' aria-current="page"' : ''}>${icon}${k === 'dashboard' ? 'Home' : ROUTES[k][1]}</a>`;
+    }).join('');
     $('#pageTitle').textContent = ROUTES[r][1];
     $('#pageSub').textContent = ROUTES[r][2];
-    $('#monthLabel').textContent = UI.monthName(ui.ym);
-    $('#privacyBtn').textContent = s.settings.privacy ? '👁 Show' : '🙈 Privacy';
-    $('#themeBtn').textContent = s.settings.theme === 'dark' ? '☀️ Light' : '🌙 Dark';
+    syncMonth();
+    $('#view').dataset.route = r;
     $('#view').innerHTML = Views[r](ui.ym, ui);
-    if (r === 'settings') bindSettings();
+    if (r === 'settings') { bindSettings(); syncDisplaySettings(); }
     Guide.afterRender();
   }
   const refresh = (msg) => { render(); if (msg) toast(msg); };
+  function setMonth(ym) {
+    ui.ym = ym;
+    if (route() === 'settings') syncMonth(); else render();
+  }
+  function chooseMonth() {
+    const [selectedYear, selectedMonth] = ui.ym.split('-').map(Number);
+    const buttons = MONTHS.map((name, i) => `<button type="button" data-month="${i + 1}">${esc(name.slice(0, 3))}</button>`).join('');
+    openModal('Choose month', `<div class="month-select-year">
+      <button class="icon-btn" type="button" id="monthPickerPreviousYear" aria-label="Previous year">‹</button>
+      <label class="field" for="monthPickerYear">Year<input id="monthPickerYear" type="number" inputmode="numeric" min="1000" max="9999" step="1" value="${selectedYear}" required /></label>
+      <button class="icon-btn" type="button" id="monthPickerNextYear" aria-label="Next year">›</button>
+    </div><div class="month-select-grid" id="monthPickerMonths" role="group" aria-label="Choose a month">${buttons}</div>
+    <div class="row-actions"><button class="btn ghost" type="button" id="monthPickerToday">This month</button></div>`, (body) => {
+      const year = $('#monthPickerYear', body), previous = $('#monthPickerPreviousYear', body), next = $('#monthPickerNextYear', body);
+      const months = $('#monthPickerMonths', body);
+      const update = () => {
+        const valid = year.checkValidity(), value = Number(year.value);
+        previous.disabled = valid && value <= 1000;
+        next.disabled = valid && value >= 9999;
+        months.querySelectorAll('button').forEach((button) => {
+          const month = Number(button.dataset.month);
+          button.setAttribute('aria-label', `${MONTHS[month - 1]}${valid ? ` ${value}` : ''}`);
+          button.setAttribute('aria-pressed', String(valid && value === selectedYear && month === selectedMonth));
+        });
+      };
+      const changeYear = (delta) => {
+        if (!year.reportValidity()) { year.focus(); return; }
+        year.value = String(Number(year.value) + delta); update();
+      };
+      year.addEventListener('input', update);
+      previous.onclick = () => changeYear(-1);
+      next.onclick = () => changeYear(1);
+      months.addEventListener('click', (event) => {
+        const button = event.target.closest('button[data-month]');
+        if (!button) return;
+        if (!year.reportValidity()) { year.focus(); return; }
+        const ym = `${Number(year.value)}-${button.dataset.month.padStart(2, '0')}`;
+        closeModal(); setMonth(ym);
+      });
+      $('#monthPickerToday', body).onclick = () => { closeModal(); setMonth(Store.monthKey(Store.todayISO())); };
+      update();
+    }, { noFocus: true });
+  }
 
   /* ---------- Option helpers ---------- */
   const accOpts = () => S().accounts.map((a) => [a.id, `${Views.ACC_ICON[a.type] || ''} ${a.name}`]);
@@ -105,7 +194,7 @@
 
     addDebt: () => debtForm(), editDebt: (id) => debtForm(S().debts.find((d) => d.id === id)),
     delDebt: (id) => confirm('Delete this debt?', () => { Store.remove('debts', id); refresh('Debt deleted'); }),
-    payDebt: (id) => { if (needAccount()) return; const d = S().debts.find((x) => x.id === id); form({ title: `Pay ${d.name}`, submitLabel: 'Record payment', fields: [{ name: 'amount', label: `Amount (balance ${d.balance.toLocaleString()})`, type: 'number', value: d.minPayment, required: true, min: 1 }, { name: 'acc', label: 'Pay from', type: 'select', options: accOpts() }, { name: 'date', label: 'Date', type: 'date', value: Store.todayISO() }],
+    payDebt: (id) => { if (needAccount()) return; const d = S().debts.find((x) => x.id === id); form({ title: `Pay ${d.name}`, submitLabel: 'Record payment', fields: [{ name: 'amount', label: `Amount (balance ${UI.moneyText(d.balance)})`, type: 'number', value: d.minPayment, required: true, min: 1 }, { name: 'acc', label: 'Pay from', type: 'select', options: accOpts() }, { name: 'date', label: 'Date', type: 'date', value: Store.todayISO() }],
       onSubmit: (v) => { Store.payDebt(id, v.amount, v.acc, v.date); const left = S().debts.find((x) => x.id === id).balance; refresh(left <= 0 ? `🎉 ${d.name} is PAID OFF!` : 'Payment recorded'); } }); },
     payDebtPick: () => { const act = S().debts.filter((d) => d.balance > 0); if (!act.length) return S().debts.length ? toast('No active debts 🎉') : Guide.start('debts'); A.payDebt(DebtEngine.order(act, S().settings.strategy, S().settings.customOrder)[0].id); },
     setStrategy: (_, el) => { S().settings.strategy = el.value; Guide.markDone('strategy'); Store.save(); refresh(`Strategy set to ${el.value}`); },
@@ -192,7 +281,7 @@
       title: isEdit ? 'Edit transaction' : 'Add transaction',
       fields: [
         { name: 'type', label: 'Type', type: 'select', options: [['expense', '➖ Expense'], ['income', '➕ Income'], ['transfer', '🔁 Transfer']], value: type },
-        { name: 'amount', label: 'Amount', type: 'number', value: t ? t.amount : '', required: true, min: 0.01, half: true, placeholder: !t && s.monthlyIncome ? `e.g. ${Math.round(s.monthlyIncome / Math.max(1, s.paydays.length))}` : '' },
+        { name: 'amount', label: 'Amount', type: 'number', value: t ? t.amount : '', required: true, min: 0.01, half: true, placeholder: !t && s.monthlyIncome && !s.privacy ? `e.g. ${Math.round(s.monthlyIncome / Math.max(1, s.paydays.length))}` : '' },
         { name: 'date', label: 'Date', type: 'date', value: t ? t.date : Store.todayISO(), required: true, half: true },
         { name: 'categoryId', label: 'Category', type: 'select', options: catOpts('expense'), value: t && t.categoryId, show: (v) => v.type === 'expense' },
         { name: 'incomeCat', label: 'Income source', type: 'select', options: catOpts('income'), value: t && t.categoryId, show: (v) => v.type === 'income' },
@@ -335,7 +424,7 @@
     ];
     const score = checks.filter((c) => c[0]).length;
     const verdict = score === checks.length ? ['ok', '✅ Yes, you can afford it.'] : score >= 3 ? ['warn', '🟠 Maybe — wait 24h and decide.'] : ['bad', '🔴 Not right now.'];
-    openModal(`${v.name || 'This purchase'} · ${S().settings.currency}${Number(v.price).toLocaleString()}`, `<div class="callout" style="font-size:16px"><span class="badge ${verdict[0]}" style="font-size:14px">${verdict[1]}</span></div>
+    openModal(`${v.name || 'This purchase'} · ${UI.moneyText(v.price)}`, `<div class="callout" style="font-size:16px"><span class="badge ${verdict[0]}" style="font-size:14px">${verdict[1]}</span></div>
       <div class="list" style="margin-top:8px">${checks.map(([ok, t]) => `<div class="item"><span>${ok ? '✅' : '❌'}</span><div class="grow">${t}</div></div>`).join('')}</div>
       <div class="row-actions" style="margin-top:12px"><button class="btn ghost" id="toWish">Add to 24h wishlist</button><button class="btn primary" id="okBtn">Got it</button></div>`, (b2) => {
       $('#okBtn', b2).onclick = closeModal;
@@ -362,6 +451,8 @@
   }
 
   function bindSettings() {
+    $('#settingsPrivacyBtn').onclick = togglePrivacy;
+    $('#settingsThemeBtn').onclick = toggleTheme;
     $('#settingsForm').onsubmit = (e) => {
       e.preventDefault(); const f = e.target.elements, st = S().settings;
       st.name = f.name.value.trim(); st.currency = f.currency.value.trim() || '₱';
@@ -396,11 +487,14 @@
   $('#modalClose').onclick = () => { if (canClose()) closeModal(); };
   $('#modal').addEventListener('click', (e) => { if (e.target.id === 'modal' && canClose()) closeModal(); });
   document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && canClose()) closeModal(); });
-  $('#prevMonth').onclick = () => { ui.ym = Store.shiftMonth(ui.ym, -1); render(); };
-  $('#nextMonth').onclick = () => { ui.ym = Store.shiftMonth(ui.ym, 1); render(); };
+  $('#prevMonth').onclick = () => setMonth(Store.shiftMonth(ui.ym, -1));
+  $('#nextMonth').onclick = () => setMonth(Store.shiftMonth(ui.ym, 1));
+  $('#monthLabel').onclick = chooseMonth;
   $('#quickAdd').onclick = () => A.addTx();
-  $('#privacyBtn').onclick = () => { S().settings.privacy = !S().settings.privacy; Store.save(); render(); };
-  $('#themeBtn').onclick = () => { S().settings.theme = S().settings.theme === 'dark' ? 'light' : 'dark'; Store.save(); render(); };
+  const togglePrivacy = () => { S().settings.privacy = !S().settings.privacy; Store.save(); if (route() === 'settings') syncDisplaySettings(); else render(); };
+  const toggleTheme = () => { S().settings.theme = S().settings.theme === 'dark' ? 'light' : 'dark'; Store.save(); syncDisplaySettings(); };
+  $('#privacyBtn').onclick = $('#iosPrivacyBtn').onclick = togglePrivacy;
+  $('#themeBtn').onclick = $('#iosThemeBtn').onclick = toggleTheme;
   window.addEventListener('hashchange', () => { window.scrollTo(0, 0); render(); });
 
   /* ---------- PIN lock ---------- */

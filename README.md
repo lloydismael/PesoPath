@@ -9,7 +9,11 @@ PesoPath is built with plain HTML, CSS and JavaScript. There is no build step an
 2. Install the recommended **Live Server** extension.
 3. Right-click `index.html` and choose **Open with Live Server**.
 
-You can also open `index.html` directly in a browser, or run `npm start`. Run `npm test` for the unit tests.
+You can also open `index.html` directly in a browser, or run `npm start`. Run `npm test` for the unit tests. `npm run test:ui` runs the browser UI checks with isolated demo data; it needs Node 22+ and Chrome or Edge (set `CHROME_PATH` if the browser is elsewhere).
+When updating cached web assets, keep the asset versions in `index.html` and the service-worker `VERSION` in sync; the tests check this.
+
+Tap the month in the header to choose a month and year, or use the arrows to move one month at a time. The picker also has a **This month** shortcut.
+On iPhone, use the eye icon to hide or show amounts and the moon/sun icon to switch appearance.
 
 ### Press F5 to run & debug
 `.vscode/launch.json` is pre-configured, so you can just:
@@ -28,7 +32,7 @@ Two routes: a **native app** (real `.apk` / iOS build) or a **PWA** (fast, no st
 ### Option A — Native Android APK
 The app is wrapped with [Capacitor](https://capacitorjs.com), so it runs in a native shell: own launcher icon, splash screen, no browser UI.
 
-A ready-to-install **`PesoPath-debug.apk`** (4.9 MB) is in the project root — copy it to the phone (USB, Drive, or `adb`) and tap it. You'll need to allow *Install unknown apps* for that source.
+The test build [`PesoPath-calendar-debug.apk`](PesoPath-calendar-debug.apk) is in the project root — copy it to the phone (USB, Drive, or `adb`) and tap it. You'll need to allow *Install unknown apps* for that source. It uses the same local debug signing certificate as the earlier `PesoPath-debug.apk`; an update to a differently signed installation will be rejected.
 
 Rebuild it yourself:
 ```bash
@@ -44,7 +48,7 @@ adb install -r android/app/build/outputs/apk/debug/app-debug.apk
 ```
 
 **Signed release build (for sharing / Play Store):**
-1. `keytool -genkey -v -keystore pesopath.jks -keyalg RSA -keysize 2048 -validity 10000 -alias pesopath`
+1. Reuse the existing release keystore and alias. Only for a first release, create a key with `keytool -genkey -v -keystore pesopath.jks -keyalg RSA -keysize 2048 -validity 10000 -alias pesopath` and keep it safe.
 2. `npm run android:sync`, then `cd android && gradlew.bat assembleRelease`
 3. Sign the output with `apksigner` (or add `signingConfigs` in `android/app/build.gradle`).
 
@@ -57,12 +61,15 @@ The Xcode project is already generated in [`ios/`](ios) (bundle id `ph.pesopath.
 
 - Xcode and the iOS SDK **only run on macOS** — there is no Windows toolchain.
 - A device install must be **code-signed** with an Apple ID (free signing = the app expires every 7 days, max 3 apps; paid Apple Developer = 1 year).
+- Dark mode uses an OLED-black background on iOS, Android, and web. **Settings** provides appearance and privacy controls on every platform; iPhone also has them in its header. Privacy hides summary and chart amounts, not editable fields, exported data, or the underlying local storage.
+
+The local [`PesoPath-calendar-unsigned.ipa`](ios-build/PesoPath-calendar-unsigned.ipa) repackages updated web assets into the earlier unsigned native build; it is not a fresh Xcode build. Re-run the iOS workflow for later native project changes. Keep the same Apple ID and bundle ID when updating, and export a backup first; the sideloading tool can still change the signing identity or App ID.
 
 Pick whichever matches your situation:
 
 #### B1 — No Mac: build in the cloud, sign on Windows (free)
 1. Push this folder to a GitHub repo (private is fine).
-2. **Actions → Build iOS app (unsigned IPA) → Run workflow**. The workflow at [.github/workflows/ios-build.yml](.github/workflows/ios-build.yml) runs on a free `macos-14` runner, produces `PesoPath-unsigned.ipa`, and uploads it as an artifact.
+2. **Actions → Build iOS app (unsigned IPA) → Run workflow**. The workflow at [.github/workflows/ios-build.yml](.github/workflows/ios-build.yml) runs on a `macos-latest` runner, produces `PesoPath-unsigned.ipa`, and uploads it as an artifact.
 3. Download the artifact, then install **Sideloadly** (<https://sideloadly.io>) or **AltStore** on your Windows PC.
 4. Connect the iPhone, drag the IPA into Sideloadly, enter your Apple ID, press **Start**. iOS will ask you to trust the developer in **Settings → General → VPN & Device Management**.
    *Free Apple IDs re-sign every 7 days; a paid developer account gives 1 year.*
@@ -73,14 +80,14 @@ Pick whichever matches your situation:
 The `.ipa` is not signed, so Windows Explorer / Apple Configurator cannot install it — it must be re-signed with your own Apple ID first. Sideloadly does that locally.
 
 0. **Prerequisites:** [Sideloadly](https://sideloadly.io) plus *iTunes* and *iCloud* installed from <https://apple.com/itunes> and <https://support.apple.com/106240> (not the Microsoft Store versions — Sideloadly needs Apple's USB drivers / `AppleMobileDeviceService`).
-1. **App-specific password:** if your Apple ID uses 2FA (most do), create one at <https://appleid.apple.com> → *Sign-In and Security → App-Specific Passwords*. Use that instead of your real password.
+1. **Apple account:** enter your credentials directly in Sideloadly when prompted; do not share them in chat. According to Sideloadly, app-specific passwords work only with a paid Apple Developer account and anisette disabled.
 2. Connect the iPhone by USB → tap **Trust This Computer** → enter the passcode. Sideloadly should list the device with its iOS version.
-3. Drag `PesoPath-unsigned.ipa` into the **IPA** box.
+3. Drag `PesoPath-calendar-unsigned.ipa` into the **IPA** box (or use the IPA downloaded from your own workflow).
 4. Type your Apple ID into the **Apple ID** field, then **Start**. Sideloadly generates a signing certificate, signs, and installs (1–3 min).
 5. **Trust the developer** on the phone: *Settings → General → VPN & Device Management → <your Apple ID> → Trust*.
 6. **iOS 16+ only:** enable *Settings → Privacy & Security → Developer Mode → On*, then restart the iPhone and confirm.
 
-Limits with a **free** Apple ID: the app works for **7 days**, max **3 sideloaded apps**, and you re-run Sideloadly to refresh (data is kept if you don't delete the app). A paid Apple Developer account extends that to 1 year.
+Limits with a **free** Apple ID: the app works for **7 days**, max **3 sideloaded apps**, and you re-run Sideloadly to refresh. A paid Apple Developer account extends that to 1 year. Before updating, export a JSON backup and verify that it can be restored; reinstalling or changing the signing identity can remove access to local data.
 
 Alternative tools: **AltStore/AltServer** (auto-refreshes over Wi-Fi while the PC is on), **SideStore** (refresh on-device), **ESign** (needs a certificate).
 
@@ -90,8 +97,8 @@ Troubleshooting:
 | "Unable to install … maximum number of apps" | Delete another sideloaded app (free ID limit is 3) |
 | App installs but won't open | Trust the developer in step 5; on iOS 16+ check Developer Mode |
 | "Could not find device" | Reinstall Apple's iTunes + iCloud, restart `AppleMobileDeviceService` |
-| Stops working after ~7 days | Re-run Sideloadly with the same Apple ID (data survives) |
-| `guru meditation` / anisette error | Use an app-specific password, or install Sideloadly's Anisette/iCloud support package |
+| Stops working after ~7 days | Back up your data if possible, then re-run Sideloadly with the same Apple ID |
+| `guru meditation` / anisette error | Consult Sideloadly's troubleshooting guidance for the specific error |
 
 #### B2 — You have access to a Mac
 ```bash
@@ -126,9 +133,40 @@ Installable web app: own icon, full-screen, offline. Phones only offer *Install*
 - **iPhone (Safari only):** open the link → **Share** (□↑) → **Add to Home Screen**
 
 ### Updating later
-Re-upload the files (or push to the repo) and reopen the app; the service worker fetches the new version on next launch. To force a clean slate, clear the site data in the browser.
+Re-upload the files (or push to the repo) and reopen the app; the service worker fetches the new version on next launch. Clearing site data also deletes the app's locally stored finances; export a backup first if you need to clear it.
 
 Files that make the PWA work: `manifest.json` (name, icons, standalone display) · `sw.js` (offline cache of the app shell) · `icons/` (192/512/maskable + Apple touch icon) · the `manifest`/`theme-color`/`apple-*` tags in `index.html`.
+
+### Azure Static Web Apps deployment
+The resource-group-scoped template [`infra/main.bicep`](infra/main.bicep) defines a new Free Static Web App in East Asia. Deploy it to the intended subscription and resource group after reviewing the Azure deployment and costs. It does not modify the existing web apps. The production workflow [`azure-static-web-apps.yml`](.github/workflows/azure-static-web-apps.yml) runs from `main` or by manual dispatch from `main`.
+
+To create the resource after approval, supply the intended subscription and resource group:
+
+```powershell
+az deployment group create --subscription '<subscription-id>' --resource-group '<resource-group>' --template-file infra\main.bicep
+```
+
+In the GitHub repository's **Settings → Secrets and variables → Actions**, configure these repository secrets:
+
+| Secret | Value |
+|---|---|
+| `AZURE_STATIC_WEB_APPS_API_TOKEN` | Deployment token for the new Static Web App |
+| `ANDROID_KEYSTORE_BASE64` | Base64 encoding of the existing Android release keystore |
+| `ANDROID_KEYSTORE_PASSWORD` | Keystore password |
+| `ANDROID_KEY_ALIAS` | Alias of the existing release key |
+| `ANDROID_KEY_PASSWORD` | Password for that key |
+
+For example, the keystore can be sent directly to GitHub from PowerShell without putting it in the repository or chat:
+
+```powershell
+[Convert]::ToBase64String([IO.File]::ReadAllBytes('C:\path\to\release.jks')) | gh secret set ANDROID_KEYSTORE_BASE64
+```
+
+Configure the other secrets in GitHub without sharing their values. The workflow tests the site, builds and verifies a release APK signed with that existing key, calls the unsigned iOS build, and deploys only the staged web assets and packages. It fails rather than using a debug key or deploying missing packages. Standard GitHub-hosted runner minutes are free for public repositories; artifact storage or private-repository usage may be billed. The public APK and unsigned IPA are offered to Android and iOS browsers respectively; the IPA must be signed before sideloading. Downloads are not available offline. The existing manually triggered iOS workflow remains available for standalone IPA builds.
+
+After creating the Azure resource, find its deployment token in the Static Web App's **Manage deployment token** page and enter it directly as the GitHub secret; do not commit or paste it into chat.
+
+Export a JSON backup before switching to the Azure origin or replacing an installation. Web, PWA, and native app storage are separate; Android also rejects an update signed with a different key, potentially requiring an uninstall and loss of local app data.
 
 ### ⚠️ Data lives on each device
 Everything is stored in `localStorage`, which is per-install/per-origin. The APK, the phone's PWA and the desktop copy do **not** share data — move it with **Settings → Backup (JSON)** and restore on the other device.

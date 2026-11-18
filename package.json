@@ -6,7 +6,8 @@
   "scripts": {
     "start": "npx --yes serve . -l 5173",
     "serve": "node scripts/serve.js",
-    "test": "node tests/debt.test.js && node tests/installments.test.js",
+    "test": "node tests/debt.test.js && node tests/installments.test.js && node tests/ios-charts.test.js && node tests/service-worker.test.js",
+    "test:ui": "node tests/ui-browser.test.js",
     "web:copy": "node scripts/copy-web.js",
     "android:sync": "npm run web:copy && cap sync android",
     "android:apk": "npm run android:sync && cd android && gradlew.bat assembleDebug",

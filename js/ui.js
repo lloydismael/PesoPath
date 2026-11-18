@@ -2,14 +2,16 @@
 const UI = (() => {
   const $ = (s, el = document) => el.querySelector(s);
   const esc = (v) => String(v ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  const amountsHidden = () => Store.get().settings.privacy;
 
   function money(n, opts = {}) {
+    if (amountsHidden()) return '<span class="amt" aria-label="Amount hidden">Hidden</span>';
     const cur = Store.get().settings.currency || '₱';
     const v = Number(n) || 0;
     const s = Math.abs(v).toLocaleString('en-PH', { minimumFractionDigits: 0, maximumFractionDigits: opts.dec ?? 0 });
     return `<span class="amt">${v < 0 ? '−' : ''}${esc(cur)} ${s}</span>`;
   }
-  function moneyText(n) { const cur = Store.get().settings.currency || '₱'; const v = Number(n) || 0; return `${v < 0 ? '−' : ''}${cur} ${Math.abs(v).toLocaleString('en-PH', { maximumFractionDigits: 0 })}`; }
+  function moneyText(n) { if (amountsHidden()) return 'Hidden'; const cur = Store.get().settings.currency || '₱'; const v = Number(n) || 0; return `${v < 0 ? '−' : ''}${cur} ${Math.abs(v).toLocaleString('en-PH', { maximumFractionDigits: 0 })}`; }
   const pct = (a, b) => (b > 0 ? Math.round((a / b) * 100) : 0);
   const monthName = (ym) => { const [y, m] = ym.split('-').map(Number); return new Date(y, m - 1, 1).toLocaleDateString('en-PH', { month: 'long', year: 'numeric' }); };
   const monthShort = (ym) => { const [y, m] = ym.split('-').map(Number); return new Date(y, m - 1, 1).toLocaleDateString('en-PH', { month: 'short', year: '2-digit' }); };
@@ -25,19 +27,62 @@ const UI = (() => {
 
   /* ---------- Modal (with hooks so the setup guide can highlight fields) ---------- */
   const hooks = { open: [], close: [] };
+  let modalState = null;
   function openModal(title, html, onMount, opts = {}) {
+    const backdrop = $('#modal'), dialog = $('.modal', backdrop);
+    if (backdrop.hidden) {
+      const background = [...document.body.children].filter((el) => el !== backdrop && el.id !== 'toast').map((el) => [el, el.inert, el.getAttribute('aria-hidden')]);
+      modalState = { x: window.scrollX, y: window.scrollY, focus: document.activeElement, background };
+      document.body.style.setProperty('--modal-scroll-top', `-${modalState.y}px`);
+      document.body.style.setProperty('--modal-scroll-left', `-${modalState.x}px`);
+      document.documentElement.classList.add('modal-open');
+      document.body.classList.add('modal-open');
+    }
     $('#modalTitle').textContent = title;
     $('#modalBody').innerHTML = html;
-    $('#modal .modal').classList.toggle('wide', !!opts.wide);
-    $('#modal').hidden = false;
+    dialog.classList.toggle('wide', !!opts.wide);
+    backdrop.hidden = false;
+    dialog.scrollTop = 0;
     $('#modalClose').hidden = !!opts.noClose;
+    dialog.focus({ preventScroll: true });
+    if (modalState) modalState.background.forEach(([el]) => { el.inert = true; el.setAttribute('aria-hidden', 'true'); });
     if (onMount) onMount($('#modalBody'));
     hooks.open.forEach((fn) => fn($('#modalBody'), opts));
     const first = $('#modalBody input:not([type=checkbox]), #modalBody select');
-    if (first && !opts.noFocus) setTimeout(() => first.focus(), 30);
+    if (first && !opts.noFocus) setTimeout(() => { if (!backdrop.hidden && first.isConnected) first.focus({ preventScroll: true }); }, 30);
   }
-  function closeModal() { $('#modal').hidden = true; $('#modalBody').innerHTML = ''; hooks.close.forEach((fn) => fn()); }
+  function closeModal() {
+    if ($('#modal').hidden) return;
+    const state = modalState;
+    modalState = null;
+    $('#modal').hidden = true; $('#modalBody').innerHTML = '';
+    document.documentElement.classList.remove('modal-open');
+    document.body.classList.remove('modal-open');
+    document.body.style.removeProperty('--modal-scroll-top');
+    document.body.style.removeProperty('--modal-scroll-left');
+    state.background.forEach(([el, inert, ariaHidden]) => {
+      el.inert = inert;
+      if (ariaHidden === null) el.removeAttribute('aria-hidden'); else el.setAttribute('aria-hidden', ariaHidden);
+    });
+    window.scrollTo(state.x, state.y);
+    hooks.close.forEach((fn) => fn());
+    if ($('#modal').hidden) {
+      const target = state.focus && state.focus.isConnected && state.focus !== document.body && state.focus.getClientRects().length ? state.focus : $('#view');
+      target.focus({ preventScroll: true });
+    }
+  }
   const isModalOpen = () => !$('#modal').hidden;
+
+  document.addEventListener('keydown', (event) => {
+    if (event.key !== 'Tab' || !isModalOpen()) return;
+    const dialog = $('#modal .modal');
+    const focusable = [...dialog.querySelectorAll('a[href], button:not([disabled]), input:not([disabled]):not([type="hidden"]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])')]
+      .filter((el) => el.tabIndex >= 0 && el.getClientRects().length);
+    const first = focusable[0], last = focusable[focusable.length - 1];
+    if (!first) { event.preventDefault(); dialog.focus({ preventScroll: true }); }
+    else if (event.shiftKey && (document.activeElement === first || !dialog.contains(document.activeElement) || document.activeElement === dialog)) { event.preventDefault(); last.focus(); }
+    else if (!event.shiftKey && (document.activeElement === last || !dialog.contains(document.activeElement))) { event.preventDefault(); first.focus(); }
+  });
 
   /**
    * fields: [{ name, label, type, options:[[v,l]], value, required, step, half, help, show:(vals)=>bool }]
@@ -86,15 +131,25 @@ const UI = (() => {
   }
 
   /* ---------- Charts (pure SVG) ---------- */
+  function chartData(headers, rows) {
+    if (!rows.length) return '';
+    const value = (n) => amountsHidden() ? 'Hidden' : Number.isFinite(n) ? n.toLocaleString('en-PH', { maximumFractionDigits: 2 }) : '—';
+    return `<details class="chart-data"><summary>View chart data</summary><div class="table-wrap"><table><thead><tr>${headers.map((h) => `<th scope="col">${esc(h)}</th>`).join('')}</tr></thead><tbody>${rows.map(([label, ...values]) => `<tr><th scope="row">${esc(label)}</th>${values.map((n) => `<td>${esc(value(n))}</td>`).join('')}</tr>`).join('')}</tbody></table></div></details>`;
+  }
+
+  function scrollableChart(svg) {
+    return `<div class="chart-scroll">${svg}</div><small class="chart-scroll-hint">Scroll to see the full chart</small>`;
+  }
+
   function donut(items, centerTop, centerBottom, size = 180) {
     const total = items.reduce((s, i) => s + i.value, 0);
     const r = size / 2 - 14, c = 2 * Math.PI * r;
     let off = 0;
     const arcs = total ? items.map((i) => { const len = (i.value / total) * c; const a = `<circle r="${r}" cx="${size / 2}" cy="${size / 2}" fill="none" stroke="${i.color}" stroke-width="22" stroke-dasharray="${len} ${c - len}" stroke-dashoffset="${-off}" transform="rotate(-90 ${size / 2} ${size / 2})"><title>${esc(i.label)}</title></circle>`; off += len; return a; }).join('')
       : `<circle r="${r}" cx="${size / 2}" cy="${size / 2}" fill="none" stroke="var(--line)" stroke-width="22"/>`;
-    const svg = `<svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}">${arcs}<text x="50%" y="48%" text-anchor="middle" font-weight="700" font-size="17" class="amt">${esc(centerTop)}</text><text x="50%" y="60%" text-anchor="middle" font-size="11" style="fill:var(--muted)">${esc(centerBottom)}</text></svg>`;
+    const svg = `<svg${items.length ? ' aria-hidden="true"' : ''} width="${size}" height="${size}" viewBox="0 0 ${size} ${size}">${arcs}<text x="50%" y="48%" text-anchor="middle" font-weight="700" font-size="17" class="amt">${esc(amountsHidden() ? 'Hidden' : centerTop)}</text><text x="50%" y="60%" text-anchor="middle" font-size="11" style="fill:var(--muted)">${esc(centerBottom)}</text></svg>`;
     const legend = items.map((i) => `<div><i style="background:${i.color}"></i><span>${esc(i.label)}</span><span>${pct(i.value, total)}%</span></div>`).join('');
-    return `<div class="donut-wrap">${svg}<div class="legend">${legend || '<div class="muted">No spending yet</div>'}</div></div>`;
+    return `<div class="donut-wrap">${svg}<div class="legend">${legend || '<div class="muted">No spending yet</div>'}</div></div>${chartData(['Category', 'Amount'], items.map((i) => [i.label, i.value]))}`;
   }
 
   function ring(p, size = 130, label = '', color) {
@@ -116,11 +171,12 @@ const UI = (() => {
       const x0 = pad + i * gw + (gw - bw * series.length) / 2;
       series.forEach((s, j) => {
         const bh = ((h - 40) * s.values[i]) / max;
-        out += `<rect x="${x0 + j * bw}" y="${h - 20 - bh}" width="${bw - 3}" height="${bh}" rx="4" fill="${s.color}"><title>${esc(s.label)}: ${Math.round(s.values[i]).toLocaleString()}</title></rect>`;
+        out += `<rect x="${x0 + j * bw}" y="${h - 20 - bh}" width="${bw - 3}" height="${bh}" rx="4" fill="${s.color}"><title>${esc(s.label)}: ${amountsHidden() ? 'Hidden' : Math.round(s.values[i]).toLocaleString()}</title></rect>`;
       });
       out += `<text x="${pad + i * gw + gw / 2}" y="${h - 4}" text-anchor="middle" font-size="11" style="fill:var(--muted)">${esc(l)}</text>`;
     });
-    return `${legendHtml(series)}<svg viewBox="0 0 ${w} ${h}" width="100%">${out}</svg>`;
+    const svg = `<svg${labels.length ? ' aria-hidden="true"' : ''} viewBox="0 0 ${w} ${h}" width="100%">${out}</svg>`;
+    return `${legendHtml(series)}${scrollableChart(svg)}${chartData(['Period', ...series.map((s) => s.label)], labels.map((label, i) => [label, ...series.map((s) => s.values[i])]))}`;
   }
 
   function stacked(labels, series, h = 220) {
@@ -134,12 +190,13 @@ const UI = (() => {
       series.forEach((s) => {
         const v = s.values[i] || 0; if (!v) return;
         const bh = ((h - 50) * v) / max; y -= bh;
-        out += `<rect x="${x}" y="${y}" width="${bw}" height="${bh}" fill="${s.color}" rx="3"><title>${esc(s.label)}: ${Math.round(v).toLocaleString()}</title></rect>`;
+        out += `<rect x="${x}" y="${y}" width="${bw}" height="${bh}" fill="${s.color}" rx="3"><title>${esc(s.label)}: ${amountsHidden() ? 'Hidden' : Math.round(v).toLocaleString()}</title></rect>`;
       });
-      out += `<text x="${x + bw / 2}" y="${y - 5}" text-anchor="middle" font-size="10" font-weight="700" class="amt">${totals[i] ? (totals[i] / 1000).toFixed(1) + 'k' : '0'}</text>`;
+      out += `<text x="${x + bw / 2}" y="${y - 5}" text-anchor="middle" font-size="10" font-weight="700" class="amt">${amountsHidden() ? 'Hidden' : totals[i] ? (totals[i] / 1000).toFixed(1) + 'k' : '0'}</text>`;
       out += `<text x="${x + bw / 2}" y="${h - 5}" text-anchor="middle" font-size="10" style="fill:var(--muted)">${esc(l)}</text>`;
     });
-    return `${legendHtml(series)}<svg viewBox="0 0 ${w} ${h}" width="100%">${out}</svg>`;
+    const svg = `<svg${labels.length ? ' aria-hidden="true"' : ''} viewBox="0 0 ${w} ${h}" width="100%">${out}</svg>`;
+    return `${legendHtml(series)}${scrollableChart(svg)}${chartData(['Period', ...series.map((s) => s.label)], labels.map((label, i) => [label, ...series.map((s) => s.values[i] || 0)]))}`;
   }
 
   function line(values, { h = 160, color = '#16a34a', labels = [] } = {}) {
@@ -150,7 +207,9 @@ const UI = (() => {
     const d = pts.map((p, i) => `${i ? 'L' : 'M'}${p[0].toFixed(1)},${p[1].toFixed(1)}`).join(' ');
     const area = `${d} L${w},${h - 20} L0,${h - 20} Z`;
     const lab = labels.map(([i, t]) => `<text x="${Math.min(w - 30, Math.max(20, i * step))}" y="${h - 4}" text-anchor="middle" font-size="11" style="fill:var(--muted)">${esc(t)}</text>`).join('');
-    return `<svg viewBox="0 0 ${w} ${h}" width="100%"><path d="${area}" fill="${color}" opacity=".12"/><path d="${d}" fill="none" stroke="${color}" stroke-width="2.5"/>${lab}</svg>`;
+    const rows = values.map((value, i) => [(labels.find(([index]) => index === i) || [i, i === 0 ? 'Start' : i === values.length - 1 ? 'End' : `Point ${i + 1}`])[1], value]);
+    const svg = `<svg aria-hidden="true" viewBox="0 0 ${w} ${h}" width="100%"><path d="${area}" fill="${color}" opacity=".12"/><path d="${d}" fill="none" stroke="${color}" stroke-width="2.5"/>${lab}</svg>`;
+    return `${scrollableChart(svg)}${chartData(['Point', 'Value'], rows)}`;
   }
 
   function download(filename, content, type = 'text/plain') {

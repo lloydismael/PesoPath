@@ -61,10 +61,10 @@ const Views = (() => {
     const c = Store.cat(t.categoryId), a = Store.acct(t.accountId), to = Store.acct(t.toAccountId);
     const sign = t.type === 'income' ? 'pos' : t.type === 'expense' ? 'neg' : '';
     const label = t.type === 'transfer' ? `Transfer → ${to ? to.name : '?'}` : (c ? c.name : 'Uncategorized');
-    return `<div class="item"><div class="ico" style="background:${c ? c.color + '22' : 'var(--info-50)'}">${t.type === 'transfer' ? '🔁' : c ? c.icon : '❔'}</div>
+    return `<div class="item transaction-item"><div class="ico" style="background:${c ? c.color + '22' : 'var(--info-50)'}">${t.type === 'transfer' ? '🔁' : c ? c.icon : '❔'}</div>
       <div class="grow"><div class="title">${esc(t.note || label)}</div><small>${esc(label)} · ${esc(a ? a.name : '—')} · ${shortDate(t.date)}</small></div>
       <div class="${sign}" style="font-weight:700">${t.type === 'income' ? '+' : t.type === 'expense' ? '−' : ''}${money(t.amount)}</div>
-      <div class="row-actions"><button class="icon-btn" data-action="editTx" data-id="${t.id}" title="Edit">✎</button><button class="icon-btn" data-action="delTx" data-id="${t.id}" title="Delete">🗑</button></div></div>`;
+      <div class="row-actions"><button class="icon-btn" data-action="editTx" data-id="${t.id}" aria-label="Edit transaction ${esc(t.note || label)}" title="Edit">✎</button><button class="icon-btn" data-action="delTx" data-id="${t.id}" aria-label="Delete transaction ${esc(t.note || label)}" title="Delete">🗑</button></div></div>`;
   }
 
   function payButton(b) {
@@ -194,7 +194,7 @@ const Views = (() => {
     const daysLeft = Math.max(0, new Date(y, m, 0).getDate() - (nowYm() === ym ? new Date().getDate() : 0));
 
     const head = `${!totalBudget ? `<div class="card setup-hero" style="margin-bottom:16px"><h3>🎯 You don’t have a budget yet</h3><small>We’ll suggest an amount for every category based on your income (${money(inc)}), debts, installments and bills using the 50/30/20 rule.</small>
-        <div style="margin-top:12px"><button class="btn lg" style="background:#fff;color:var(--primary)" data-action="autoBudget">✨ Suggest my budget</button></div></div>` : ''}
+        <div style="margin-top:12px"><button class="btn lg budget-suggest" data-action="autoBudget">✨ Suggest my budget</button></div></div>` : ''}
     <div class="grid g3">
       <div class="card" style="display:flex;gap:16px;align-items:center">${UI.ring(pct(totalSpent, totalBudget))}<div><div style="font-size:20px;font-weight:700">${money(totalSpent)}</div><small>of ${money(totalBudget)}</small></div></div>
       <div class="card stat"><div class="label">Remaining</div><div class="value ${totalBudget - totalSpent < 0 ? 'neg' : 'pos'}">${money(totalBudget - totalSpent)}</div><small>${daysLeft} day(s) left · ${money(Math.max(0, totalBudget - totalSpent) / Math.max(1, daysLeft))}/day</small></div>
@@ -263,7 +263,7 @@ const Views = (() => {
     if (tab === 'list') {
       body = `<div class="card"><div class="table-wrap"><table><thead><tr><th>Debt</th><th>Type</th><th class="num">Balance</th><th class="num">APR</th><th class="num">Minimum</th><th class="num">Due</th><th>Flag</th><th></th></tr></thead><tbody>
       ${s.debts.map((d) => { const f = DebtEngine.flag(d); const paid = pct((+d.original || +d.balance) - d.balance, +d.original || +d.balance); return `<tr><td><b>${esc(d.name)}</b><div style="width:140px;margin-top:4px">${progress(paid)}</div><small>${paid}% paid</small></td><td>${DEBT_TYPES[d.type] || d.type}</td><td class="num">${money(d.balance)}</td><td class="num">${d.apr}%</td><td class="num">${money(d.minPayment)}</td><td class="num">Day ${d.dueDay}</td><td><span class="badge ${f.cls}">${f.label}</span></td>
-        <td><div class="row-actions">${d.balance > 0 ? `<button class="btn sm" data-action="payDebt" data-id="${d.id}">Pay</button>` : ''}<button class="icon-btn" data-action="editDebt" data-id="${d.id}">✎</button><button class="icon-btn" data-action="delDebt" data-id="${d.id}">🗑</button></div></td></tr>`; }).join('') || '<tr><td colspan="8" class="empty"><div style="font-size:34px">💳</div>No debts yet. Click “＋ Add debt” for each credit card, loan or lending app.</td></tr>'}
+        <td><div class="row-actions">${d.balance > 0 ? `<button class="btn sm" data-action="payDebt" data-id="${d.id}">Pay</button>` : ''}<button class="icon-btn" data-action="editDebt" data-id="${d.id}" aria-label="Edit debt ${esc(d.name)}">✎</button><button class="icon-btn" data-action="delDebt" data-id="${d.id}" aria-label="Delete debt ${esc(d.name)}">🗑</button></div></td></tr>`; }).join('') || '<tr><td colspan="8" class="empty"><div style="font-size:34px">💳</div>No debts yet. Click “＋ Add debt” for each credit card, loan or lending app.</td></tr>'}
       </tbody></table></div>
       <div style="margin-top:10px" class="badges"><span class="badge bad">🔴 APR ≥ 24% or overdue = Urgent</span><span class="badge warn">🟠 Due within 7 days</span><span class="badge ok">🟢 Low interest / stable</span></div>
       <div class="callout" style="margin-top:12px">📦 Fixed-term purchases (gadgets, appliances via Home Credit, SPayLater, card installments) are tracked in <a href="#/installments">Installments</a>.</div></div>`;
@@ -274,7 +274,7 @@ const Views = (() => {
         <div class="card-head"><h3>Recommended order</h3><select data-action="setStrategy" style="width:auto">${[['avalanche', 'Avalanche – highest interest first'], ['snowball', 'Snowball – smallest balance first'], ['custom', 'Custom order']].map(([k, l]) => `<option value="${k}" ${s.settings.strategy === k ? 'selected' : ''}>${l}</option>`).join('')}</select></div>
         <div class="list">${ordered.map((d, i) => { const r = plan.debts.find((x) => x.id === d.id); const f = DebtEngine.flag(d); return `<div class="item"><div class="rank">${i + 1}</div><div class="grow"><div class="title">${esc(d.name)} ${i === 0 ? '<span class="badge bad">Focus here</span>' : ''}</div><small>${money(d.balance)} @ ${d.apr}% APR · <span class="badge ${f.cls}">${f.label}</span></small></div>
           <div style="text-align:right"><small>Paid off</small><div><b>${r && r.paidOffMonth ? DebtEngine.monthLabel(r.paidOffMonth) : '—'}</b></div></div>
-          ${s.settings.strategy === 'custom' ? `<div style="display:flex;flex-direction:column"><button class="icon-btn" data-action="moveDebt" data-id="${d.id}" data-dir="-1">▲</button><button class="icon-btn" data-action="moveDebt" data-id="${d.id}" data-dir="1">▼</button></div>` : ''}</div>`; }).join('') || '<div class="empty">No active debts 🎉</div>'}</div>
+          ${s.settings.strategy === 'custom' ? `<div style="display:flex;flex-direction:column"><button class="icon-btn" data-action="moveDebt" data-id="${d.id}" data-dir="-1" aria-label="Move ${esc(d.name)} up">▲</button><button class="icon-btn" data-action="moveDebt" data-id="${d.id}" data-dir="1" aria-label="Move ${esc(d.name)} down">▼</button></div>` : ''}</div>`; }).join('') || '<div class="empty">No active debts 🎉</div>'}</div>
         <div class="tip" style="margin-top:12px">💡 <div>Always pay the <b>minimum on all debts</b>, then throw every extra peso at #1. When it’s gone, its payment <b>rolls over</b> to #2 (snowball effect).</div></div>
       </div>
       <div class="card"><h3>Projected total debt</h3><p class="muted">${!active.length ? 'Add debts to see your projection.' : plan.feasible ? `Debt-free in <b>${plan.months} months</b> (${DebtEngine.monthLabel(plan.months)}) · Total interest ${money(plan.totalInterest)}` : 'Not feasible with current payments – increase the extra amount.'}</p>
@@ -290,7 +290,7 @@ const Views = (() => {
         <div class="stat"><div class="label">Interest paid</div><div class="value neg" style="font-size:18px">${money(r.totalInterest)}</div>${r !== base && base.feasible && r.feasible && base.months ? `<small class="pos">Saves ${money(base.totalInterest - r.totalInterest)} · ${base.months - r.months} mo sooner</small>` : ''}</div></div></div>`;
       body = `<div class="card"><h3>Extra monthly payment: <span id="simVal">${money(extra)}</span></h3>
         <input type="range" min="0" max="20000" step="500" value="${extra}" data-action="simExtra" />
-        <div class="row-actions" style="margin-top:8px"><button class="btn sm primary" data-action="saveExtra" data-id="${extra}">Use ${esc(s.settings.currency)}${extra.toLocaleString()} in my plan</button></div></div>
+        <div class="row-actions" style="margin-top:8px"><button class="btn sm primary" data-action="saveExtra" data-id="${extra}">Use ${money(extra)} in my plan</button></div></div>
         <div class="grid g3" style="margin-top:16px">${col('Minimums only', base, 'No extra, no rollover')}${col('🏔️ Avalanche', av, 'Highest interest first – saves the most')}${col('⛄ Snowball', sn, 'Smallest balance first – quick wins')}</div>
         <div class="card" style="margin-top:16px">${UI.bars(['Minimums', 'Avalanche', 'Snowball'], [{ label: 'Months to debt-free', color: '#3b82f6', values: [base.months, av.months, sn.months] }], 170)}</div>`;
     } else {
@@ -327,7 +327,7 @@ const Views = (() => {
       <small>Cash price ${money(st.principal)} · Total cost ${money(st.total)} · ${st.interest > 0 ? `<span class="neg">Interest ${money(st.interest)} (${st.addOnRate.toFixed(2)}%/mo add-on)</span>` : '<span class="pos">0% interest ✅</span>'}</small>
       <div class="row-actions">
         ${st.done ? '' : `<button class="btn sm ${st.behind ? 'danger' : 'primary'}" data-action="payInst" data-id="${it.id}">${st.behind ? `Catch up (${st.behind})` : 'Pay this month'}</button>`}
-        <button class="icon-btn" data-action="editInst" data-id="${it.id}" title="Edit">✎</button><button class="icon-btn" data-action="delInst" data-id="${it.id}" title="Delete">🗑</button>
+        <button class="icon-btn" data-action="editInst" data-id="${it.id}" aria-label="Edit installment ${esc(it.name)}" title="Edit">✎</button><button class="icon-btn" data-action="delInst" data-id="${it.id}" aria-label="Delete installment ${esc(it.name)}" title="Delete">🗑</button>
       </div></div>`;
   }
 
@@ -355,7 +355,9 @@ const Views = (() => {
     const t = new Date(), dim = new Date(t.getFullYear(), t.getMonth() + 1, 0).getDate();
     const tx = lw + (Installments.monthsBetween(from, nowYm()) + (t.getDate() - 1) / dim) * cw;
     if (tx >= lw && tx <= w) g += `<line x1="${tx}" y1="${top - 6}" x2="${tx}" y2="${h}" stroke="var(--bad)" stroke-width="2" stroke-dasharray="4 3"/><text x="${tx}" y="${H - 3}" text-anchor="middle" font-size="10" font-weight="700" style="fill:var(--bad)">Today</text>`;
-    return `<div class="table-wrap"><svg viewBox="0 0 ${w + 40} ${H}" width="100%" style="min-width:640px">${g}</svg></div>`;
+    const rows = list.map(({ it, st }) => `<tr><th scope="row">${esc(it.name)}</th><td>${esc(monthName(it.start))}</td><td>${esc(monthName(st.endYm))}</td><td>${st.paid} / ${st.terms}</td><td>${st.behind}</td></tr>`).join('');
+    return `<div class="chart-scroll timeline-chart"><svg aria-hidden="true" viewBox="0 0 ${w + 40} ${H}" width="100%">${g}</svg></div><small class="chart-scroll-hint">Scroll to see the full chart</small>
+      <details class="chart-data"><summary>View timeline data</summary><div class="table-wrap"><table><thead><tr><th scope="col">Installment</th><th scope="col">Starts</th><th scope="col">Ends</th><th scope="col">Paid / total terms</th><th scope="col">Late terms</th></tr></thead><tbody>${rows}</tbody></table></div></details>`;
   }
 
   function installments(ym, ui) {
@@ -392,7 +394,7 @@ const Views = (() => {
     } else if (tab === 'timeline') {
       body = `<div class="card"><h3>Installment timeline</h3><p class="muted">Solid = paid · light = remaining · red = late · dashed line = today</p>${gantt(all)}</div>`;
     } else {
-      body = `<div class="card"><div class="list">${done.map(({ it, st, color }) => `<div class="item"><div class="ico" style="background:${color}22">${esc(it.icon || '📦')}</div><div class="grow"><div class="title">${esc(it.name)} <span class="badge ok">🎉 Fully paid</span></div><small>${esc(it.provider || '')} · ${st.terms} terms · finished ${esc(monthName(st.endYm))}</small></div><b>${money(st.total)}</b><button class="icon-btn" data-action="delInst" data-id="${it.id}">🗑</button></div>`).join('') || '<div class="empty">No completed installments yet — you’ll get there!</div>'}</div></div>`;
+      body = `<div class="card"><div class="list">${done.map(({ it, st, color }) => `<div class="item"><div class="ico" style="background:${color}22">${esc(it.icon || '📦')}</div><div class="grow"><div class="title">${esc(it.name)} <span class="badge ok">🎉 Fully paid</span></div><small>${esc(it.provider || '')} · ${st.terms} terms · finished ${esc(monthName(st.endYm))}</small></div><b>${money(st.total)}</b><button class="icon-btn" data-action="delInst" data-id="${it.id}" aria-label="Delete installment ${esc(it.name)}">🗑</button></div>`).join('') || '<div class="empty">No completed installments yet — you’ll get there!</div>'}</div></div>`;
     }
     return head + body;
   }
@@ -410,7 +412,7 @@ const Views = (() => {
         <small>Based on your average monthly expenses of ${money(avg)}.</small>` : emptyCta('🛡️', 'No emergency fund yet. Start with a small starter fund.', 'addGoal', 'Create', 'ef')}</div>
       <div class="card"><div class="card-head"><h3>🛒 24-hour cooling-off wishlist</h3><button class="btn sm" data-action="addWish">＋ Add</button></div>
         <p class="muted">Add impulse buys here. Wait 24 hours before deciding — especially before signing up for a new installment.</p>
-        <div class="list">${s.wishlist.map((w) => { const ready = now - w.added >= 864e5; return `<div class="item"><div class="ico">🛍️</div><div class="grow"><div class="title">${esc(w.name)}</div><small>${ready ? 'Cooling-off done – still want it?' : `Wait ${Math.ceil((864e5 - (now - w.added)) / 36e5)}h more`}</small></div><b>${money(w.price)}</b><button class="icon-btn" title="Skip it (saved!)" data-action="delWish" data-id="${w.id}">✅</button></div>`; }).join('') || '<div class="empty">Nothing on the list. 👏</div>'}</div></div>
+        <div class="list">${s.wishlist.map((w) => { const ready = now - w.added >= 864e5; return `<div class="item"><div class="ico">🛍️</div><div class="grow"><div class="title">${esc(w.name)}</div><small>${ready ? 'Cooling-off done – still want it?' : `Wait ${Math.ceil((864e5 - (now - w.added)) / 36e5)}h more`}</small></div><b>${money(w.price)}</b><button class="icon-btn" title="Skip it (saved!)" aria-label="Skip ${esc(w.name)}" data-action="delWish" data-id="${w.id}">✅</button></div>`; }).join('') || '<div class="empty">Nothing on the list. 👏</div>'}</div></div>
     </div>
     <div class="card" style="margin-top:16px"><div class="card-head"><h3>Goals & sinking funds</h3><button class="btn sm primary" data-action="addGoal">＋ New goal</button></div>
       <div class="grid g3">${s.goals.filter((g) => !g.emergency).map((g) => {
@@ -419,7 +421,7 @@ const Views = (() => {
         if (g.deadline && left > 0) { const ms = Math.max(1, Math.round((new Date(g.deadline) - new Date()) / (30.4 * 864e5))); perMonth = `<small>Save ${money(left / ms)}/mo to hit it by ${shortDate(g.deadline)}</small>`; }
         return `<div class="card" style="box-shadow:none"><div style="display:flex;gap:10px;align-items:center"><div class="ico">${g.icon || '🎯'}</div><div class="grow"><b>${esc(g.name)}</b><br><small>${money(g.saved)} / ${money(g.target)}</small></div><b>${pct(g.saved, g.target)}%</b></div>
           <div style="margin:10px 0">${progress(pct(g.saved, g.target))}</div>${perMonth}
-          <div class="row-actions" style="margin-top:8px"><button class="btn sm" data-action="contribute" data-id="${g.id}">＋ Add money</button><button class="icon-btn" data-action="editGoal" data-id="${g.id}">✎</button><button class="icon-btn" data-action="delGoal" data-id="${g.id}">🗑</button></div></div>`;
+          <div class="row-actions" style="margin-top:8px"><button class="btn sm" data-action="contribute" data-id="${g.id}">＋ Add money</button><button class="icon-btn" data-action="editGoal" data-id="${g.id}" aria-label="Edit goal ${esc(g.name)}">✎</button><button class="icon-btn" data-action="delGoal" data-id="${g.id}" aria-label="Delete goal ${esc(g.name)}">🗑</button></div></div>`;
       }).join('') || '<div class="empty">No goals yet. Saving for Christmas, school fees or a trip? Add a goal.</div>'}</div></div>`;
   }
 
@@ -440,8 +442,8 @@ const Views = (() => {
 
     return `<div class="grid g2">
       <div class="card"><div class="card-head"><h3>Bills · ${monthName(ym)}</h3><button class="btn sm primary" data-action="addBill">＋ Add bill</button></div>
-        <div class="list">${s.bills.slice().sort((a, b) => a.dueDay - b.dueDay).map((b) => { const paid = (b.paid || {})[ym]; return `<div class="item"><div class="ico">${b.subscription ? '🔁' : '🧾'}</div><div class="grow"><div class="title">${esc(b.name)}</div><small>Due day ${b.dueDay}</small></div><b>${money(b.amount)}</b>
-          ${paid ? '<span class="badge ok">Paid</span>' : `<button class="btn sm" data-action="payBill" data-id="${b.id}" data-ym="${ym}">Mark paid</button>`}<button class="icon-btn" data-action="editBill" data-id="${b.id}">✎</button><button class="icon-btn" data-action="delBill" data-id="${b.id}">🗑</button></div>`; }).join('') || '<div class="empty"><div style="font-size:34px">🧾</div>No bills yet. Add rent, Meralco, water, internet and subscriptions.</div>'}</div></div>
+        <div class="list">${s.bills.slice().sort((a, b) => a.dueDay - b.dueDay).map((b) => { const paid = (b.paid || {})[ym]; return `<div class="item bill-item"><div class="ico">${b.subscription ? '🔁' : '🧾'}</div><div class="grow"><div class="title">${esc(b.name)}</div><small>Due day ${b.dueDay}</small></div><b>${money(b.amount)}</b>
+          <div class="row-actions bill-actions">${paid ? '<span class="badge ok">Paid</span>' : `<button class="btn sm" data-action="payBill" data-id="${b.id}" data-ym="${ym}">Mark paid</button>`}<button class="icon-btn" data-action="editBill" data-id="${b.id}" aria-label="Edit bill ${esc(b.name)}">✎</button><button class="icon-btn" data-action="delBill" data-id="${b.id}" aria-label="Delete bill ${esc(b.name)}">🗑</button></div></div>`; }).join('') || '<div class="empty"><div style="font-size:34px">🧾</div>No bills yet. Add rent, Meralco, water, internet and subscriptions.</div>'}</div></div>
       <div class="card"><div class="card-head"><h3>🔁 Subscriptions</h3><span class="badge info">${money(subTotal)}/mo · ${money(subTotal * 12)}/yr</span></div>
         <div class="list">${subs.map((b) => `<div class="item"><div class="grow"><div class="title">${esc(b.name)}</div><small>${money(b.amount * 12)} per year</small></div><b>${money(b.amount)}</b><button class="btn sm danger" data-action="delBill" data-id="${b.id}">Cancel?</button></div>`).join('') || '<div class="empty">No subscriptions tracked. Tick “This is a subscription” when adding a bill.</div>'}</div>
         <div class="tip" style="margin-top:12px">✂️ <div>Cancelling subscriptions you rarely use frees up money for debt payoff. ${subTotal ? `All of these together = ${money(subTotal * 12)}/year.` : ''}</div></div></div>
@@ -496,10 +498,10 @@ const Views = (() => {
   function accounts() {
     const s = S();
     return `<div class="card"><div class="card-head"><h3>Accounts</h3><button class="btn sm primary" data-action="addAccount">＋ Add account</button></div>
-      <div class="list">${s.accounts.map((a) => `<div class="item"><div class="ico">${ACC_ICON[a.type] || '📁'}</div><div class="grow"><div class="title">${esc(a.name)}</div><small>${a.type} · opening ${money(a.opening)}</small></div><b>${money(Store.accountBalance(a.id))}</b><button class="btn sm ghost" data-action="transfer" data-id="${a.id}">Transfer</button><button class="icon-btn" data-action="editAccount" data-id="${a.id}">✎</button><button class="icon-btn" data-action="delAccount" data-id="${a.id}">🗑</button></div>`).join('') || '<div class="empty"><div style="font-size:34px">🏦</div>No accounts yet. Add your bank, e-wallet (GCash/Maya) or cash with “＋ Add account”.</div>'}</div>
+      <div class="list">${s.accounts.map((a) => `<div class="item account-item"><div class="ico">${ACC_ICON[a.type] || '📁'}</div><div class="grow"><div class="title">${esc(a.name)}</div><small>${a.type} · opening ${money(a.opening)}</small></div><b class="account-balance">${money(Store.accountBalance(a.id))}</b><div class="row-actions account-actions"><button class="btn sm ghost" data-action="transfer" data-id="${a.id}">Transfer</button><button class="icon-btn" data-action="editAccount" data-id="${a.id}" aria-label="Edit account ${esc(a.name)}">✎</button><button class="icon-btn" data-action="delAccount" data-id="${a.id}" aria-label="Delete account ${esc(a.name)}">🗑</button></div></div>`).join('') || '<div class="empty"><div style="font-size:34px">🏦</div>No accounts yet. Add your bank, e-wallet (GCash/Maya) or cash with “＋ Add account”.</div>'}</div>
       <div class="callout" style="margin-top:12px">💡 Credit cards and loans go under <a href="#/debts">Debts</a>; fixed-term purchases go under <a href="#/installments">Installments</a>. Transfers between accounts are not counted as spending.</div></div>
       <div class="card" style="margin-top:16px"><div class="card-head"><h3>Categories</h3><button class="btn sm primary" data-action="addCat">＋ Add category</button></div>
-      <div class="badges">${s.categories.map((c) => `<span class="badge info" style="background:${c.color}22;color:inherit;font-size:13px;padding:6px 10px">${c.icon} ${esc(c.name)} · ${c.group} <a href="#" data-action="editCat" data-id="${c.id}" style="text-decoration:none">✎</a></span>`).join('')}</div></div>`;
+      <div class="badges">${s.categories.map((c) => `<span class="badge info" style="background:${c.color}22;color:inherit;font-size:13px;padding:6px 10px">${c.icon} ${esc(c.name)} · ${c.group} <a class="category-edit" href="#" data-action="editCat" data-id="${c.id}" aria-label="Edit category ${esc(c.name)}" style="text-decoration:none">✎</a></span>`).join('')}</div></div>`;
   }
 
   /* ---------- Settings ---------- */
@@ -516,6 +518,8 @@ const Views = (() => {
       </form></div>
       <div class="card"><h3 style="margin-bottom:12px">Setup, data & privacy</h3><p class="muted">All data is stored locally in your browser (localStorage). Nothing is sent to a server.</p>
         <div class="list">
+          <div class="item"><div class="grow">Appearance<br><small>Switch between light and OLED black</small></div><button class="btn sm ghost" id="settingsThemeBtn" type="button"></button></div>
+          <div class="item"><div class="grow">Privacy mode<br><small>Hide summary amounts; entry fields remain visible</small></div><button class="btn sm ghost" id="settingsPrivacyBtn" type="button"></button></div>
           <div class="item"><div class="grow">🧭 Setup guide <br><small>${gp.done}/${gp.total} steps done</small></div><button class="btn sm primary" data-action="restartGuide">${Guide.isActive() ? 'Open guide' : 'Restart guide'}</button></div>
           <div class="item"><div class="grow">Backup all data (JSON)</div><button class="btn sm" data-action="exportJson">Export</button></div>
           <div class="item"><div class="grow">Restore from backup</div><button class="btn sm" data-action="importJson">Import</button></div>

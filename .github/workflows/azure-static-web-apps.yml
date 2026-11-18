@@ -1,0 +1,158 @@
+name: Deploy PesoPath to Azure Static Web Apps
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - 'android/**'
+      - 'ios/**'
+      - 'js/**'
+      - 'css/**'
+      - 'icons/**'
+      - 'scripts/**'
+      - 'tests/**'
+      - 'index.html'
+      - 'manifest.json'
+      - 'sw.js'
+      - 'staticwebapp.config.json'
+      - 'capacitor.config.json'
+      - 'package.json'
+      - 'package-lock.json'
+      - '.github/workflows/ios-build.yml'
+      - '.github/workflows/azure-static-web-apps.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pesopath-production
+  cancel-in-progress: false
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Verify production branch
+        run: |
+          if [ "$GITHUB_REF" != 'refs/heads/main' ]; then
+            echo '::error::Production deployment must run from main.'
+            exit 1
+          fi
+      - name: Verify required secrets
+        env:
+          AZURE_STATIC_WEB_APPS_API_TOKEN: ${{ secrets.AZURE_STATIC_WEB_APPS_API_TOKEN }}
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          for name in AZURE_STATIC_WEB_APPS_API_TOKEN ANDROID_KEYSTORE_BASE64 ANDROID_KEYSTORE_PASSWORD ANDROID_KEY_ALIAS ANDROID_KEY_PASSWORD; do
+            if [ -z "${!name:-}" ]; then
+              echo "::error::Missing required GitHub Actions secret: $name"
+              exit 1
+            fi
+          done
+      - run: npm test
+      - run: npm run test:ui -- downloads
+      - run: npm run test:ui -- pwa
+
+  android:
+    needs: test
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Install dependencies
+        run: npm ci
+      - name: Bundle web assets and sync Android
+        run: |
+          npm run web:copy
+          npx cap sync android
+      - name: Build unsigned release APK
+        working-directory: android
+        run: bash gradlew assembleRelease
+      - name: Sign and verify release APK
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          set -eu
+          for name in ANDROID_KEYSTORE_BASE64 ANDROID_KEYSTORE_PASSWORD ANDROID_KEY_ALIAS ANDROID_KEY_PASSWORD; do
+            if [ -z "${!name:-}" ]; then
+              echo "::error::Missing required GitHub Actions secret: $name"
+              exit 1
+            fi
+          done
+          : "${ANDROID_HOME:?Android SDK is required}"
+          build_tools="$ANDROID_HOME/build-tools/34.0.0"
+          keystore="$RUNNER_TEMP/pesopath-release.keystore"
+          trap 'rm -f -- "$keystore"' EXIT
+          printf '%s' "$ANDROID_KEYSTORE_BASE64" | base64 --decode > "$keystore"
+          "$build_tools/zipalign" -f -p 4 android/app/build/outputs/apk/release/app-release-unsigned.apk "$RUNNER_TEMP/PesoPath-aligned.apk"
+          "$build_tools/apksigner" sign --ks "$keystore" --ks-key-alias "$ANDROID_KEY_ALIAS" --ks-pass env:ANDROID_KEYSTORE_PASSWORD --key-pass env:ANDROID_KEY_PASSWORD --out "$RUNNER_TEMP/PesoPath.apk" "$RUNNER_TEMP/PesoPath-aligned.apk"
+          "$build_tools/apksigner" verify --verbose "$RUNNER_TEMP/PesoPath.apk"
+          "$build_tools/zipalign" -c -p 4 "$RUNNER_TEMP/PesoPath.apk"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: PesoPath-release-apk
+          path: ${{ runner.temp }}/PesoPath.apk
+          if-no-files-found: error
+          retention-days: 30
+
+  ios:
+    needs: test
+    uses: ./.github/workflows/ios-build.yml
+
+  deploy:
+    needs: [android, ios]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Stage public web assets
+        run: |
+          node scripts/copy-web.js
+          cp staticwebapp.config.json dist/staticwebapp.config.json
+      - uses: actions/download-artifact@v4
+        with:
+          name: PesoPath-release-apk
+          path: dist/downloads
+      - uses: actions/download-artifact@v4
+        with:
+          name: PesoPath-unsigned-ipa
+          path: dist/downloads
+      - name: Verify deploy inputs
+        env:
+          DEPLOYMENT_TOKEN: ${{ secrets.AZURE_STATIC_WEB_APPS_API_TOKEN }}
+        run: |
+          test -s dist/downloads/PesoPath.apk
+          test -s dist/downloads/PesoPath-unsigned.ipa
+          if [ -z "$DEPLOYMENT_TOKEN" ]; then
+            echo '::error::Missing required GitHub Actions secret: AZURE_STATIC_WEB_APPS_API_TOKEN'
+            exit 1
+          fi
+      - name: Deploy prebuilt site
+        uses: Azure/static-web-apps-deploy@v1
+        with:
+          azure_static_web_apps_api_token: ${{ secrets.AZURE_STATIC_WEB_APPS_API_TOKEN }}
+          action: upload
+          app_location: dist
+          output_location: ''
+          skip_app_build: true
