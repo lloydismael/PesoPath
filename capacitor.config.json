@@ -1,0 +1,11 @@
+{
+  "appId": "ph.pesopath.app",
+  "appName": "PesoPath",
+  "webDir": "dist",
+  "android": {
+    "allowMixedContent": false
+  },
+  "server": {
+    "androidScheme": "https"
+  }
+}

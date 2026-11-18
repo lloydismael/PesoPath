@@ -1,0 +1,50 @@
+{
+	"version": "2.0.0",
+	"tasks": [
+		{
+			"label": "Start PesoPath",
+			"type": "shell",
+			"command": "node",
+			"args": [
+				"scripts/serve.js"
+			],
+			"isBackground": true,
+			"problemMatcher": {
+				"owner": "pesopath",
+				"pattern": {
+					"regexp": "^PesoPath-ERROR:\\s+(.+)$",
+					"message": 1
+				},
+				"background": {
+					"activeOnStart": true,
+					"beginsPattern": "PesoPath server starting",
+					"endsPattern": "PesoPath server ready"
+				}
+			},
+			"presentation": {
+				"reveal": "silent",
+				"panel": "dedicated",
+				"clear": true
+			}
+		},
+		{
+			"label": "Start PesoPath (npm)",
+			"type": "shell",
+			"command": "npm.cmd",
+			"args": [
+				"start"
+			],
+			"isBackground": true,
+			"problemMatcher": []
+		},
+		{
+			"label": "Run tests",
+			"type": "shell",
+			"command": "npm.cmd",
+			"args": [
+				"test"
+			],
+			"problemMatcher": []
+		}
+	]
+}

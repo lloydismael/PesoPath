@@ -1,0 +1,20 @@
+{
+  "name": "pesopath",
+  "version": "1.2.0",
+  "description": "PesoPath – budget tracker, debt-freedom planner & installment tracker with guided first-time setup (vanilla HTML/CSS/JS)",
+  "private": true,
+  "scripts": {
+    "start": "npx --yes serve . -l 5173",
+    "serve": "node scripts/serve.js",
+    "test": "node tests/debt.test.js && node tests/installments.test.js",
+    "web:copy": "node scripts/copy-web.js",
+    "android:sync": "npm run web:copy && cap sync android",
+    "android:apk": "npm run android:sync && cd android && gradlew.bat assembleDebug",
+    "android:open": "npm run android:sync && cap open android"
+  },
+  "devDependencies": {
+    "@capacitor/android": "^6.2.3",
+    "@capacitor/cli": "^6.2.3",
+    "@capacitor/core": "^6.2.3"
+  }
+}
