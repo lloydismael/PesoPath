@@ -2,6 +2,8 @@
 
 PesoPath is built with plain HTML, CSS and JavaScript. There is no build step and nothing to install. All data is saved in your browser's **localStorage**.
 
+> **Live app:** <https://lloydismael.github.io/PesoPath/> — hosted free on GitHub Pages, so it installs as a PWA on your phone.
+
 ## ▶️ Run it in VS Code
 1. Extract the zip, then go to **File → Open Folder… → `pesopath`**.
 2. Install the recommended **Live Server** extension.
