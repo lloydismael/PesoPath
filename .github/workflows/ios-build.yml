@@ -23,7 +23,9 @@ on:
 
 jobs:
   build:
-    runs-on: macos-14
+    # macos-latest is the only macOS label available on this account;
+    # explicit macos-14/macos-15 fail with "configuration ... is not supported".
+    runs-on: macos-latest
     timeout-minutes: 45
 
     steps:
