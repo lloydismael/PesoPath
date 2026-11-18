@@ -10,11 +10,14 @@
     "web:copy": "node scripts/copy-web.js",
     "android:sync": "npm run web:copy && cap sync android",
     "android:apk": "npm run android:sync && cd android && gradlew.bat assembleDebug",
-    "android:open": "npm run android:sync && cap open android"
+    "android:open": "npm run android:sync && cap open android",
+    "ios:sync": "npm run web:copy && cap sync ios",
+    "ios:open": "npm run ios:sync && cap open ios"
   },
   "devDependencies": {
     "@capacitor/android": "^6.2.3",
     "@capacitor/cli": "^6.2.3",
-    "@capacitor/core": "^6.2.3"
+    "@capacitor/core": "^6.2.3",
+    "@capacitor/ios": "^6.2.3"
   }
 }

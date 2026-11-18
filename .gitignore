@@ -10,4 +10,15 @@ android/.idea/
 android/app/src/main/assets/public/
 android/app/src/main/assets/capacitor.config.json
 android/app/src/main/assets/capacitor.plugins.json
+ios/App/Pods/
+ios/App/build/
+ios/App/output/
+ios/build/
+ios/App/App/public/
+ios/App/App/capacitor.config.json
+ios/App/App/config.xml
+ios/App/App.xcworkspace/xcuserdata/
+ios/App/App.xcodeproj/xcuserdata/
+*.xcarchive
+*.ipa
 *.log

@@ -52,14 +52,44 @@ The app id is `ph.pesopath.app` — change it in `capacitor.config.json` before 
 
 ---
 
-### Option B — Test on iPhone / iPad
-Capacitor's iOS target **needs macOS + Xcode**; it can't be built on Windows.
+### Option B — Native iOS app
+The Xcode project is already generated in [`ios/`](ios) (bundle id `ph.pesopath.app`, iOS 13+, branded icon + splash, shared `App` scheme). iOS builds are fundamentally different from Android:
 
-| Goal | How |
-|---|---|
-| **Try it on an iPhone right now** | Use the PWA route below (Safari → *Add to Home Screen*). Same code, full-screen, offline. |
-| **Native iOS build** | On a Mac: `npm install && npx cap add ios && npx cap sync ios && npx cap open ios` → choose your iPhone/simulator in Xcode → Run. A free Apple ID is enough for a physical device. |
-| **No Mac available** | Push to GitHub and build on a cloud macOS runner (Codemagic, GitHub Actions `macos-*`, Ionic Appflow), then distribute via TestFlight or ad-hoc. |
+- Xcode and the iOS SDK **only run on macOS** — there is no Windows toolchain.
+- A device install must be **code-signed** with an Apple ID (free signing = the app expires every 7 days, max 3 apps; paid Apple Developer = 1 year).
+
+Pick whichever matches your situation:
+
+#### B1 — No Mac: build in the cloud, sign on Windows (free)
+1. Push this folder to a GitHub repo (private is fine).
+2. **Actions → Build iOS app (unsigned IPA) → Run workflow**. The workflow at [.github/workflows/ios-build.yml](.github/workflows/ios-build.yml) runs on a free `macos-14` runner, produces `PesoPath-unsigned.ipa`, and uploads it as an artifact.
+3. Download the artifact, then install **Sideloadly** (<https://sideloadly.io>) or **AltStore** on your Windows PC.
+4. Connect the iPhone, drag the IPA into Sideloadly, enter your Apple ID, press **Start**. iOS will ask you to trust the developer in **Settings → General → VPN & Device Management**.
+   *Free Apple IDs re-sign every 7 days; a paid developer account gives 1 year.*
+
+> The IPA is unsigned on purpose — Apple's signing certificates can't be stored in a public workflow without secrets. If you have a paid account, add `IOS_CERTIFICATE_P12`, `IOS_CERTIFICATE_PASSWORD`, `IOS_PROVISIONING_PROFILE`, `APPLE_TEAM_ID` as repo secrets and swap the last step for `xcodebuild -exportArchive`.
+
+#### B2 — You have access to a Mac
+```bash
+npm install
+npm run ios:sync          # copy web assets + pod install
+npm run ios:open          # opens ios/App/App.xcworkspace in Xcode
+```
+In Xcode: select the **App** target → *Signing & Capabilities* → choose your Team (add your Apple ID under *Xcode → Settings → Accounts* if it's not listed) → pick your iPhone as the destination → **Run** (⌘R).
+
+Requirements on that Mac: Xcode 15+, CocoaPods (`brew install cocoapods`), Node 20+.
+
+CLI equivalent (device must be trusted + connected):
+```bash
+cd ios/App && pod install && xcodebuild -workspace App.xcworkspace -scheme App \
+  -configuration Debug -destination 'generic/platform=iOS' -allowProvisioningUpdates build
+```
+
+#### B3 — TestFlight / App Store
+Needs a paid Apple Developer account ($99/yr). Archive in Xcode (*Product → Archive → Distribute App → App Store Connect*), then add testers in App Store Connect → TestFlight. Bundle id must be registered and the icon must be opaque (already is).
+
+#### B4 — Fastest check on an iPhone (no signing at all)
+Use the PWA route below — Safari → *Share* → *Add to Home Screen*. Same code, full-screen, works offline, no Apple ID.
 
 ---
 
@@ -129,4 +159,6 @@ icons/              # App icons (192/512/maskable + Apple touch icon)
 capacitor.config.json # Native (Android/iOS) wrapper config: appId, appName, webDir
 scripts/copy-web.js # Copies the static app into dist/ for native builds
 android/            # Generated Capacitor Android project (Gradle)
+ios/                # Generated Capacitor iOS project (Xcode/CocoaPods)
+.github/workflows/  # CI: macOS job that builds an unsigned iOS IPA
 ```

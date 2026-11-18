@@ -1,0 +1,75 @@
+name: Build iOS app (unsigned IPA)
+
+# Runs on a GitHub-hosted macOS machine, so no Mac is needed locally.
+# The produced .ipa is unsigned: sign it with Sideloadly / AltStore / iOS App Signer
+# (free Apple ID) before installing on a device, or use it as a CI smoke test.
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main, master]
+    paths:
+      - 'ios/**'
+      - 'js/**'
+      - 'css/**'
+      - 'icons/**'
+      - 'index.html'
+      - 'manifest.json'
+      - 'sw.js'
+      - 'capacitor.config.json'
+      - 'package.json'
+      - 'scripts/**'
+      - '.github/workflows/ios-build.yml'
+
+jobs:
+  build:
+    runs-on: macos-14
+    timeout-minutes: 45
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Bundle web assets and sync native project
+        run: |
+          npm run web:copy
+          npx cap sync ios
+
+      - name: Install CocoaPods dependencies
+        run: pod install --project-directory=ios/App
+
+      - name: Build unsigned archive
+        run: |
+          xcodebuild \
+            -workspace ios/App/App.xcworkspace \
+            -scheme App \
+            -configuration Release \
+            -sdk iphoneos \
+            -derivedDataPath build/DerivedData \
+            -archivePath build/PesoPath.xcarchive \
+            CODE_SIGN_IDENTITY="" \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGNING_ALLOWED=NO \
+            archive
+
+      - name: Package unsigned IPA
+        run: |
+          mkdir -p build/Payload
+          cp -R build/PesoPath.xcarchive/Products/Applications/App.app build/Payload/
+          cd build
+          zip -qry PesoPath-unsigned.ipa Payload
+          ls -lh PesoPath-unsigned.ipa
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: PesoPath-unsigned-ipa
+          path: build/PesoPath-unsigned.ipa
+          if-no-files-found: error
+          retention-days: 30
