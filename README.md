@@ -69,6 +69,30 @@ Pick whichever matches your situation:
 
 > The IPA is unsigned on purpose — Apple's signing certificates can't be stored in a public workflow without secrets. If you have a paid account, add `IOS_CERTIFICATE_P12`, `IOS_CERTIFICATE_PASSWORD`, `IOS_PROVISIONING_PROFILE`, `APPLE_TEAM_ID` as repo secrets and swap the last step for `xcodebuild -exportArchive`.
 
+#### Sideloading the unsigned IPA from Windows (Sideloadly)
+The `.ipa` is not signed, so Windows Explorer / Apple Configurator cannot install it — it must be re-signed with your own Apple ID first. Sideloadly does that locally.
+
+0. **Prerequisites:** [Sideloadly](https://sideloadly.io) plus *iTunes* and *iCloud* installed from <https://apple.com/itunes> and <https://support.apple.com/106240> (not the Microsoft Store versions — Sideloadly needs Apple's USB drivers / `AppleMobileDeviceService`).
+1. **App-specific password:** if your Apple ID uses 2FA (most do), create one at <https://appleid.apple.com> → *Sign-In and Security → App-Specific Passwords*. Use that instead of your real password.
+2. Connect the iPhone by USB → tap **Trust This Computer** → enter the passcode. Sideloadly should list the device with its iOS version.
+3. Drag `PesoPath-unsigned.ipa` into the **IPA** box.
+4. Type your Apple ID into the **Apple ID** field, then **Start**. Sideloadly generates a signing certificate, signs, and installs (1–3 min).
+5. **Trust the developer** on the phone: *Settings → General → VPN & Device Management → <your Apple ID> → Trust*.
+6. **iOS 16+ only:** enable *Settings → Privacy & Security → Developer Mode → On*, then restart the iPhone and confirm.
+
+Limits with a **free** Apple ID: the app works for **7 days**, max **3 sideloaded apps**, and you re-run Sideloadly to refresh (data is kept if you don't delete the app). A paid Apple Developer account extends that to 1 year.
+
+Alternative tools: **AltStore/AltServer** (auto-refreshes over Wi-Fi while the PC is on), **SideStore** (refresh on-device), **ESign** (needs a certificate).
+
+Troubleshooting:
+| Symptom | Fix |
+|---|---|
+| "Unable to install … maximum number of apps" | Delete another sideloaded app (free ID limit is 3) |
+| App installs but won't open | Trust the developer in step 5; on iOS 16+ check Developer Mode |
+| "Could not find device" | Reinstall Apple's iTunes + iCloud, restart `AppleMobileDeviceService` |
+| Stops working after ~7 days | Re-run Sideloadly with the same Apple ID (data survives) |
+| `guru meditation` / anisette error | Use an app-specific password, or install Sideloadly's Anisette/iCloud support package |
+
 #### B2 — You have access to a Mac
 ```bash
 npm install

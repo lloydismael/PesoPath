@@ -21,4 +21,5 @@ ios/App/App.xcworkspace/xcuserdata/
 ios/App/App.xcodeproj/xcuserdata/
 *.xcarchive
 *.ipa
+ios-build/
 *.log
