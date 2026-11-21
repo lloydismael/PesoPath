@@ -1,4 +1,4 @@
-// Run with Node 22+ and Chrome/Edge: node tests/ui-browser.test.js [modal|display|calendar|charts|layout|pwa|downloads]
+// Run with Node 22+ and Chrome/Edge: node tests/ui-browser.test.js [modal|debt|display|calendar|charts|layout|pwa|downloads]
 const assert = require('assert');
 const fs = require('fs');
 const http = require('http');
@@ -27,7 +27,7 @@ async function main() {
   const downloadRequests = [];
   const legacyWorker = `
     const CACHE = 'pesopath-legacy-fixture';
-    self.addEventListener('install', e => e.waitUntil(caches.open(CACHE).then(c => c.addAll(['./', './index.html', './css/styles.css?v=1.2.1', './js/ui.js?v=1.2.1'])).then(() => self.skipWaiting())));
+    self.addEventListener('install', e => e.waitUntil(caches.open(CACHE).then(c => c.addAll(['./', './index.html', './css/styles.css?v=1.2.4', './js/ui.js?v=1.2.4'])).then(() => self.skipWaiting())));
     self.addEventListener('activate', e => e.waitUntil(self.clients.claim()));
     self.addEventListener('fetch', e => {
       if (e.request.mode === 'navigate') e.respondWith(fetch(e.request).catch(() => caches.match('./index.html')));
@@ -49,7 +49,7 @@ async function main() {
     fs.readFile(file, (error, data) => {
       if (error) { res.writeHead(404).end(); return; }
       res.writeHead(200, { 'Content-Type': mime[path.extname(file)] || 'application/octet-stream', 'Cache-Control': 'no-store' });
-      if (serveLegacy && pathname === '/index.html') res.end(data.toString().replace(/(\.(?:css|js))\?v=[^"']+/g, '$1?v=1.2.1'));
+      if (serveLegacy && pathname === '/index.html') res.end(data.toString().replace(/(\.(?:css|js))\?v=[^"']+/g, '$1?v=1.2.4'));
       else if (serveLegacy && pathname === '/js/ui.js') res.end(data.toString() + '\nwindow.__legacyUiLoaded = true;');
       else res.end(data);
     });
@@ -125,11 +125,11 @@ async function main() {
       await send('Input.dispatchKeyEvent', { type: key === 'Enter' ? 'keyDown' : 'rawKeyDown', ...event, ...(key === 'Enter' ? { text: '\r', unmodifiedText: '\r' } : {}) });
       await send('Input.dispatchKeyEvent', { type: 'keyUp', ...event });
     }
-    async function touchPan(x, from, to) {
+    async function touchPan(x, from, to, toX = x) {
       await send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x, y: from, id: 0 }] });
       for (let i = 1; i <= 8; i++) {
         await wait(20);
-        await send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ x, y: from + (to - from) * i / 8, id: 0 }] });
+        await send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ x: x + (toX - x) * i / 8, y: from + (to - from) * i / 8, id: 0 }] });
       }
       await send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
       await wait(350);
@@ -352,6 +352,57 @@ async function main() {
         assert.strictEqual(today.label.trim(), today.expected, 'the shortcut must return to the current month');
       });
     }
+    test('modal', 'a long payment title cannot make a narrow form swipe sideways', async () => {
+      await navigate('ios');
+      await evaluate(`PesoPath.Store.get().debts[0].name = 'UnbrokenSyntheticDebtName'.repeat(10)`);
+      await route('debts');
+      await evaluate(`document.querySelector('[data-action="payDebt"]').click()`);
+      const before = await evaluate(`(() => {
+        const modal = document.querySelector('#modal .modal');
+        const header = document.querySelector('.modal-head').getBoundingClientRect();
+        const close = document.querySelector('#modalClose').getBoundingClientRect();
+        return { y: Math.round(header.top + 20), width: modal.clientWidth, contentWidth: modal.scrollWidth, closeRight: close.right };
+      })()`);
+      await touchPan(250, before.y, before.y, 90);
+      assert.strictEqual(await evaluate(`document.querySelector('#modal .modal').scrollLeft`), 0, 'swiping left must not move the dialog content');
+      await touchPan(90, before.y, before.y, 250);
+      assert.strictEqual(await evaluate(`document.querySelector('#modal .modal').scrollLeft`), 0, 'swiping right must not move the dialog content');
+      assert(before.contentWidth <= before.width && before.closeRight <= before.width, 'the title and close button must fit inside the dialog');
+    });
+    test('modal', 'long budget labels do not widen stacked fields beyond the dialog', async () => {
+      await navigate('ios');
+      await evaluate(`PesoPath.Store.get().categories.find((c) => c.group === 'needs').name = 'LongSyntheticCategoryName'.repeat(10)`);
+      await route('budget');
+      const result = await evaluate(`(() => {
+        document.querySelector('[data-action="autoBudget"]').click();
+        const modal = document.querySelector('#modal .modal');
+        const widths = [...document.querySelectorAll('#mform input')].map((input) => input.getBoundingClientRect().width);
+        return { width: modal.clientWidth, contentWidth: modal.scrollWidth, widths };
+      })()`);
+      assert(result.contentWidth <= result.width && result.widths.every((width) => width < result.width), 'long labels must wrap without clipping their inputs');
+      assert(result.widths.every((width) => width === result.widths[0]), 'stacked budget fields must have equal widths');
+    });
+    test('modal', 'transaction fields have matching heights and equal widths within each row', async () => {
+      for (const [platform, width, mobile] of [['ios', 320, true], ['android', 320, true], ['web', 1024, false]]) {
+        await navigate(platform, width, 768, mobile);
+        const sizes = await evaluate(`(() => {
+          PesoPath.Store.get().accounts[0].name = 'Long synthetic account name '.repeat(8);
+          document.querySelector('#quickAdd').click();
+          const { elements } = document.querySelector('#mform');
+          return ['type', 'amount', 'date', 'categoryId', 'accountId', 'note'].map((name) => {
+            const { width, height } = elements[name].getBoundingClientRect();
+            return { width, height };
+          });
+        })()`);
+        assert(sizes.every(({ height }) => height >= 44 && height === sizes[0].height), `${platform}: all single-line controls must have the same height`);
+        if (mobile) {
+          assert(sizes.every(({ width }) => width === sizes[0].width), `${platform}: stacked fields must fill the same width`);
+        } else {
+          assert.strictEqual(sizes[1].width, sizes[2].width, 'paired fields must have the same width');
+          assert(sizes[1].width < sizes[0].width && sizes[4].width === sizes[0].width, 'wide layouts must preserve paired and full-width fields');
+        }
+      }
+    });
     test('modal', 'non-dismissible and replacement dialogs preserve scroll and focus', async () => {
       await navigate('ios');
       const before = await evaluate(`(() => {
@@ -430,6 +481,78 @@ async function main() {
       })()`);
       assert.strictEqual(result.id, 'bottomFocus');
       assert(result.top >= result.modalTop && result.bottom <= result.modalBottom, 'wrapped focus must be visible inside the dialog');
+    });
+    test('debt', 'fixed payments update the APR estimate and save only the debt fields', async () => {
+      await navigate('web');
+      await route('debts');
+      const result = await evaluate(`(() => {
+        document.querySelector('[data-action="addDebt"]').click();
+        const form = document.querySelector('#mform'), fields = form.elements;
+        const set = (name, value) => {
+          if (!fields[name]) return;
+          fields[name].value = value;
+          fields[name].dispatchEvent(new Event('input', { bubbles: true }));
+        };
+        const preview = () => document.querySelector('#mpreview').textContent;
+        set('name', 'Synthetic fixed-payment loan');
+        set('balance', 20100);
+        set('minPayment', 10201);
+        const beforeTerm = preview();
+        set('remainingPayments', 2);
+        const firstEstimate = preview();
+        set('minPayment', 10049);
+        form.requestSubmit();
+        const rejected = UI.isModalOpen() && !PesoPath.Store.get().debts.some((debt) => debt.name === fields.name.value);
+        const cleared = preview();
+        set('minPayment', 10302);
+        const updatedPreview = preview();
+        form.requestSubmit();
+        PesoPath.Store.load();
+        const saved = PesoPath.Store.get().debts.find((debt) => debt.name === 'Synthetic fixed-payment loan');
+        return { beforeTerm, firstEstimate, rejected, cleared, updatedPreview, saved };
+      })()`);
+      assert.doesNotMatch(result.beforeTerm, /%/, 'a balance and payment alone must not produce an APR');
+      assert.match(result.firstEstimate, /12%/);
+      assert(result.rejected, 'an impossible payment schedule must not save a debt without an APR');
+      assert.doesNotMatch(result.cleared, /%/, 'an invalid schedule must clear a stale estimate');
+      assert.match(result.updatedPreview, /20%/);
+      assert.match(result.updatedPreview, /monthly interest\s*₱\s*335/i, 'show the next month’s estimated interest on the current balance');
+      assert.match(result.updatedPreview, /remaining interest\s*₱\s*504/i, 'show the total remaining interest on the fixed schedule');
+      assert.strictEqual(result.saved?.apr, 20);
+      assert(!('remainingPayments' in result.saved), 'the estimation input must not change the saved debt shape');
+    });
+    test('debt', 'an explicitly entered APR overrides the estimate and survives later edits', async () => {
+      await navigate('web');
+      await route('debts');
+      const result = await evaluate(`(() => {
+        document.querySelector('[data-action="addDebt"]').click();
+        const form = document.querySelector('#mform'), fields = form.elements;
+        const set = (name, value) => {
+          if (!fields[name]) return;
+          fields[name].value = value;
+          fields[name].dispatchEvent(new Event('input', { bubbles: true }));
+        };
+        set('name', 'Synthetic manual-rate loan');
+        set('balance', 20100);
+        set('minPayment', 10201);
+        set('remainingPayments', 2);
+        set('apr', 0);
+        set('balance', 20000);
+        const override = fields.apr.value, manualPreview = document.querySelector('#mpreview').textContent;
+        set('apr', '');
+        const resumed = document.querySelector('#mpreview').textContent;
+        set('apr', 0);
+        form.requestSubmit();
+        const debt = PesoPath.Store.get().debts.find((item) => item.name === 'Synthetic manual-rate loan');
+        document.querySelector('[data-action="editDebt"][data-id="' + debt.id + '"]').click();
+        const edit = document.querySelector('#mform');
+        return { override, manualPreview, resumed, saved: debt.apr, reopened: edit.elements.apr.value };
+      })()`);
+      assert.strictEqual(result.override, '0', '0% is a valid manual override');
+      assert.match(result.manualPreview, /monthly interest\s*₱\s*0/i, 'the preview must use the manual APR');
+      assert.match(result.resumed, /16\.04%/, 'clearing the manual APR should resume calculation');
+      assert.strictEqual(result.saved, 0);
+      assert.strictEqual(result.reopened, '0', 'reopening an existing debt keeps the saved rate');
     });
     test('display', 'switching theme in the iOS header preserves an unsaved Settings draft', async () => {
       await navigate('ios', 393, 852);
@@ -656,8 +779,9 @@ async function main() {
       assert(result.current, 'the upgraded application must load');
       assert(!result.legacy, 'the upgraded page must not execute the previous cached UI');
       await evaluate(`PesoPath.Store.reset('demo'); PesoPath.Store.get().settings.privacy = true; PesoPath.Store.save()`);
-      for (let i = 0; i < 100 && !await evaluate(`caches.has('pesopath-1.2.3').then(async (found) => found && !(await caches.has('pesopath-legacy-fixture')))`); i++) await wait(50);
-      assert(await evaluate(`caches.has('pesopath-1.2.3').then(async (found) => found && !(await caches.has('pesopath-legacy-fixture')))`), 'the new worker must activate');
+      const upgraded = `caches.has('pesopath-1.2.5').then(async (found) => found && !(await caches.has('pesopath-legacy-fixture')))`;
+      for (let i = 0; i < 100 && !await evaluate(upgraded); i++) await wait(50);
+      assert(await evaluate(upgraded), 'the new worker must activate');
       offline = true;
       await send('Page.navigate', { url: `${base}?platform=pwa&offline=1` });
       for (let i = 0; i < 100 && !await evaluate(`location.search.includes('offline=1') && !!window.PesoPath`); i++) await wait(50);

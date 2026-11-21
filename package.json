@@ -4,9 +4,9 @@
   "description": "PesoPath – budget tracker, debt-freedom planner & installment tracker with guided first-time setup (vanilla HTML/CSS/JS)",
   "private": true,
   "scripts": {
-    "start": "npx --yes serve . -l 5173",
+    "start": "node scripts/serve.js",
     "serve": "node scripts/serve.js",
-    "test": "node tests/debt.test.js && node tests/installments.test.js && node tests/ios-charts.test.js && node tests/service-worker.test.js",
+    "test": "node tests/debt.test.js && node tests/installments.test.js && node tests/ios-charts.test.js && node tests/service-worker.test.js && node --test tests/serve.test.js",
     "test:ui": "node tests/ui-browser.test.js",
     "web:copy": "node scripts/copy-web.js",
     "android:sync": "npm run web:copy && cap sync android",

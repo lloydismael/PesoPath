@@ -42,7 +42,7 @@ const Guide = (() => {
       why: 'Credit cards, loans, lending apps, family loans. This unlocks your debt-free date and payoff order.',
       done: (s) => s.debts.length > 0, route: 'debts', prep: (ui) => { ui.debtTab = 'list'; }, target: '#view [data-action="addDebt"]',
       tipTitle: 'Click “＋ Add debt”', tipText: 'Add your highest-interest debt first (usually credit cards or lending apps). Repeat for each debt.',
-      fields: [['name', 'Who you owe'], ['balance', 'Amount you still owe'], ['apr', 'Yearly interest % — 3%/month ≈ 36%'], ['minPayment', 'Minimum due every month'], ['dueDay', 'Day of the month it’s due']] },
+      fields: [['name', 'Who you owe'], ['balance', 'Amount you still owe'], ['minPayment', 'Amount due every month'], ['apr', 'Enter the yearly rate or leave blank and add the remaining term for a fixed-payment loan'], ['dueDay', 'Day of the month it’s due']] },
     { id: 'installments', group: 'debt', icon: '📦', title: 'Add your installments', mins: 1, needs: ['account'], skippable: 'No installments',
       why: 'Gadgets or appliances on Home Credit, SPayLater, BillEase or card installment. Tracks every term until fully paid.',
       done: (s) => s.installments.length > 0, route: 'installments', prep: (ui) => { ui.instTab = 'active'; }, target: '#view [data-action="addInst"]',

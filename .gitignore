@@ -1,3 +1,6 @@
+# Local installers and backups
+/artifacts/
+
 # Android/iOS build artifacts
 dist/
 node_modules/

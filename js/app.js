@@ -348,20 +348,31 @@
     if (c) $('#delCat').onclick = () => { if (S().transactions.some((t) => t.categoryId === c.id)) return toast('Category is in use'); Store.remove('categories', c.id); delete S().budgets[c.id]; Store.save(); closeModal(); refresh('Category deleted'); };
   }
   function debtForm(d) {
-    form({ title: d ? 'Edit debt' : 'Add debt',
-      intro: d ? '' : '<div class="tip" style="margin-bottom:12px">💡 Monthly rate × 12 = APR. e.g. 3%/month ≈ 36% APR. Not sure? Credit cards ≈ 36%, lending apps 36–60%, salary loans ≈ 10–12%.</div>',
+    const getApr = (v) => v.apr ?? DebtEngine.estimateApr(v.balance, v.minPayment, v.remainingPayments);
+    form({ title: d ? 'Edit debt' : 'Add debt', livePreview: true,
       fields: [
         { name: 'name', label: 'Creditor / name', value: d && d.name, required: true, placeholder: 'e.g. BPI Credit Card' },
         { name: 'type', label: 'Type', type: 'select', options: Object.entries(Views.DEBT_TYPES), value: d && d.type },
         { name: 'balance', label: 'Current balance', type: 'number', value: d && d.balance, required: true, min: 0, half: true },
-        { name: 'apr', label: 'Interest rate (APR % per year)', type: 'number', value: d && d.apr, required: true, min: 0, half: true },
-        { name: 'minPayment', label: 'Minimum monthly payment', type: 'number', value: d && d.minPayment, required: true, min: 0, half: true },
-        { name: 'dueDay', label: 'Due day of month', type: 'number', value: (d && d.dueDay) || 15, required: true, min: 1, step: 1, half: true },
+        { name: 'minPayment', label: 'Monthly payment', type: 'number', value: d && d.minPayment, required: true, min: 0, half: true, help: 'Use the fixed amount due for a loan or the minimum due for a credit card.' },
+        { name: 'apr', label: 'Interest rate (APR % per year)', type: 'number', value: d && d.apr, nullable: true, min: 0, half: true, help: 'Use your lender’s rate when known (3% per month ≈ 36% per year), or leave blank to estimate.' },
+        { name: 'remainingPayments', label: 'Remaining monthly payments (optional)', type: 'number', min: 1, max: DebtEngine.MAX_MONTHS, step: 1, half: true, help: 'For a fixed-payment loan only. Assumes equal monthly payments and excludes fees.' },
+        { name: 'dueDay', label: 'Due day of month', type: 'number', value: (d && d.dueDay) || 15, required: true, min: 1, step: 1 },
         { name: 'overdue', label: 'Currently overdue / in collections', type: 'checkbox', value: d && d.overdue },
-      ], onSubmit: (v) => {
+      ], onChange: (v) => {
+        const apr = getApr(v);
+        if (apr === null) return v.remainingPayments ? '<div class="callout">Check the balance, fixed monthly payment, and number of payments, or enter the lender’s APR.</div>' : '';
+        if (apr < 0 || v.balance <= 0) return '';
+        const estimated = v.apr === null;
+        return `<div class="callout">${estimated ? `<div>Estimated APR <b>${apr}%</b></div>` : ''}
+          <div>Estimated monthly interest <b>${UI.money(v.balance * (apr / 1200), { dec: 2 })}</b></div>
+          ${estimated ? `<div>Estimated remaining interest <b>${UI.money(Math.max(0, v.minPayment * v.remainingPayments - v.balance), { dec: 2 })}</b></div>` : ''}</div>`;
+      }, onSubmit: ({ remainingPayments, ...v }) => {
         if (v.dueDay < 1 || v.dueDay > 31) { toast('Due day must be 1–31'); return false; }
-        const tip = v.apr > 0 && v.minPayment <= (v.balance * v.apr) / 1200 ? ' ⚠️ Minimum doesn’t cover interest!' : '';
-        Store.upsert('debts', { ...(d ? { id: d.id, original: Math.max(+d.original || 0, v.balance) } : { original: v.balance }), ...v });
+        const apr = getApr({ ...v, remainingPayments });
+        if (apr === null) { toast('Enter an APR or a valid fixed-payment schedule'); return false; }
+        const tip = apr > 0 && v.minPayment <= (v.balance * apr) / 1200 ? ' ⚠️ Minimum doesn’t cover interest!' : '';
+        Store.upsert('debts', { ...(d ? { id: d.id, original: Math.max(+d.original || 0, v.balance) } : { original: v.balance }), ...v, apr });
         refresh((d ? 'Debt saved' : 'Debt added — add another or continue') + tip);
       } });
   }

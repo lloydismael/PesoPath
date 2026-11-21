@@ -15,9 +15,9 @@ async function main() {
       location: { origin: 'https://example.test' },
     },
     caches: {
-      keys: async () => ['pesopath-1.2.0', 'pesopath-1.2.1', 'pesopath-1.2.2', 'pesopath-1.2.3', 'another-app-cache'],
+      keys: async () => ['pesopath-1.2.0', 'pesopath-1.2.1', 'pesopath-1.2.2', 'pesopath-1.2.3', 'pesopath-1.2.4', 'pesopath-1.2.5', 'another-app-cache'],
       delete: async (key) => { deleted.push(key); },
-      open: async (key) => { assert.strictEqual(key, 'pesopath-1.2.3'); return current; },
+      open: async (key) => { assert.strictEqual(key, 'pesopath-1.2.5'); return current; },
       match: async () => 'unrelated stale response',
     },
     fetch: async () => { throw new Error('offline'); },
@@ -28,7 +28,7 @@ async function main() {
   let completed;
   handlers.activate({ waitUntil: (promise) => { completed = promise; } });
   await completed;
-  assert.deepStrictEqual(deleted, ['pesopath-1.2.0', 'pesopath-1.2.1', 'pesopath-1.2.2'], 'activation must preserve other applications\' caches');
+  assert.deepStrictEqual(deleted, ['pesopath-1.2.0', 'pesopath-1.2.1', 'pesopath-1.2.2', 'pesopath-1.2.3', 'pesopath-1.2.4'], 'activation must preserve other applications\' caches');
 
   const fetchRequest = async (request) => {
     let response;
@@ -46,7 +46,7 @@ async function main() {
   const shell = vm.runInContext('SHELL', context);
   assert(assets.length > 0, 'application assets must be present');
   for (const asset of assets) {
-    assert.match(asset, /\?v=1\.2\.3$/, `${asset} must bypass the previous version's cache`);
+    assert.match(asset, /\?v=1\.2\.5$/, `${asset} must bypass the previous version's cache`);
     assert(shell.includes(`./${asset}`), `${asset} must be precached for offline use`);
   }
   console.log('Service worker cache test passed');

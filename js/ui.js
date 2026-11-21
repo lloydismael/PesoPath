@@ -85,9 +85,9 @@ const UI = (() => {
   });
 
   /**
-   * fields: [{ name, label, type, options:[[v,l]], value, required, step, half, help, show:(vals)=>bool }]
+   * fields: [{ name, label, type, options:[[v,l]], value, required, step, half, help, show:(vals)=>bool, nullable }]
    */
-  function form({ title, fields, submitLabel = 'Save', onSubmit, extraButtons = '', intro = '', onChange, wide, guideKey }) {
+  function form({ title, fields, submitLabel = 'Save', onSubmit, extraButtons = '', intro = '', onChange, livePreview, wide, guideKey }) {
     const fieldHtml = (f) => {
       const v = f.value ?? '';
       const req = f.required ? 'required' : '';
@@ -102,20 +102,26 @@ const UI = (() => {
     fields.forEach((f) => { if (f.half) { buf.push(fieldHtml(f)); if (buf.length === 2) { html += `<div class="two">${buf.join('')}</div>`; buf = []; } } else { if (buf.length) { html += `<div class="two">${buf.join('')}</div>`; buf = []; } html += fieldHtml(f); } });
     if (buf.length) html += `<div class="two">${buf.join('')}</div>`;
 
-    openModal(title, `${intro}<form class="form" id="mform" data-guide-key="${esc(guideKey || '')}">${html}<div id="mpreview"></div><div class="row-actions">${extraButtons}<button type="button" class="btn ghost" data-close>Cancel</button><button class="btn primary" type="submit">${esc(submitLabel)}</button></div></form>`, (body) => {
+    openModal(title, `${intro}<form class="form" id="mform" data-guide-key="${esc(guideKey || '')}">${html}<div id="mpreview"${livePreview ? ' role="status"' : ''}></div><div class="row-actions">${extraButtons}<button type="button" class="btn ghost" data-close>Cancel</button><button class="btn primary" type="submit">${esc(submitLabel)}</button></div></form>`, (body) => {
       const frm = $('#mform', body);
       const read = () => {
         const out = {};
         fields.forEach((f) => {
           const el = frm.elements[f.name]; if (!el) return;
-          out[f.name] = f.type === 'checkbox' ? el.checked : f.type === 'number' ? (el.value === '' ? 0 : Number(el.value)) : el.value;
+          if (f.type === 'checkbox') out[f.name] = el.checked;
+          else if (f.type === 'number') out[f.name] = f.nullable && el.value === '' ? null : Number(el.value);
+          else out[f.name] = el.value;
         });
         return out;
       };
+      let previousPreview = '';
       const update = () => {
         const vals = read();
         fields.forEach((f) => { if (f.show) { const w = $(`[data-f="${f.name}"]`, frm); if (w) w.style.display = f.show(vals) ? '' : 'none'; } });
-        if (onChange) $('#mpreview', frm).innerHTML = onChange(vals) || '';
+        if (onChange) {
+          const preview = onChange(vals) || '';
+          if (preview !== previousPreview) $('#mpreview', frm).innerHTML = previousPreview = preview;
+        }
       };
       frm.addEventListener('change', update); frm.addEventListener('input', update); update();
       body.querySelector('[data-close]').onclick = closeModal;

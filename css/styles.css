@@ -121,21 +121,26 @@ input, select, textarea { font: inherit; color: var(--text); background: var(--c
 input:focus, select:focus, textarea:focus { outline: 2px solid var(--primary); border-color: var(--primary); }
 .toolbar input, .toolbar select { width: auto; }
 label.field { display: flex; flex-direction: column; gap: 5px; font-size: 12px; color: var(--muted); font-weight: 600; position: relative; }
-.form { display: grid; gap: 12px; }
-.form .two { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.form { display: grid; grid-template-columns: minmax(0, 1fr); gap: 12px; overflow-wrap: break-word; touch-action: pan-y pinch-zoom; }
+.form .two { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.form input:not([type=checkbox]):not([type=radio]):not([type=range]),
+.form select, .form textarea { min-width: 0; min-height: 44px; font-size: 1rem; }
+.form textarea { resize: vertical; }
 .check { display: flex; gap: 8px; align-items: center; font-size: 13px; color: var(--text); }
 .check input { width: auto; }
 input[type=range] { padding: 0; accent-color: var(--primary); }
 .field-help { font-weight: 400; font-size: 11px; color: var(--muted); }
 
-html.modal-open { overflow: hidden; }
+html.modal-open { overflow: hidden; overscroll-behavior-x: none; }
 body.modal-open { position: fixed; top: var(--modal-scroll-top); left: var(--modal-scroll-left); width: 100%; }
 .modal-backdrop { position: fixed; inset: 0; background: rgba(10,20,15,.45); display: grid; place-items: center; z-index: 50; padding: 16px; overscroll-behavior: contain; }
 .modal-backdrop[hidden] { display: none; }
-.modal { background: var(--card); border-radius: 18px; width: min(500px, 100%); max-height: 92vh; max-height: min(92vh, calc(100dvh - 32px)); overflow: auto; overscroll-behavior: contain; -webkit-overflow-scrolling: touch; box-shadow: 0 20px 60px rgba(0,0,0,.25); }
+.modal { background: var(--card); border-radius: 18px; width: min(500px, 100%); max-height: 92vh; max-height: min(92vh, calc(100dvh - 32px)); overflow-x: hidden; overflow-y: auto; overscroll-behavior: none contain; touch-action: pan-y pinch-zoom; -webkit-overflow-scrolling: touch; box-shadow: 0 20px 60px rgba(0,0,0,.25); }
 .modal.wide { width: min(640px, 100%); }
-.modal-head { display: flex; justify-content: space-between; align-items: center; padding: 16px 18px; border-bottom: 1px solid var(--line); position: sticky; top: 0; background: var(--card); z-index: 1; }
-.modal-body { padding: 18px; }
+.modal-head { display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 16px 18px; border-bottom: 1px solid var(--line); position: sticky; top: 0; background: var(--card); z-index: 1; }
+.modal-head h3 { min-width: 0; overflow-wrap: break-word; }
+.modal-head .icon-btn { flex: none; }
+.modal-body { padding: 18px; overflow-wrap: break-word; }
 .toast { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%) translateY(120px); background: #14231b; color: #fff; padding: 10px 16px; border-radius: 10px; transition: transform .25s, opacity .25s; opacity: 0; z-index: 90; pointer-events: none; }
 .toast.show { transform: translateX(-50%) translateY(0); opacity: 1; }
 
@@ -280,7 +285,7 @@ body.modal-open .guide-next, body.modal-open .spot-layer { display: none; }
   .android-app .bottom-nav a { min-width: 48px; min-height: 48px; }
   .bottom-nav a span { font-size: 18px; }
   .bottom-nav a.active { color: var(--primary); font-weight: 600; }
-  .form .two { grid-template-columns: 1fr; }
+  .form .two { grid-template-columns: minmax(0, 1fr); }
   .guide-fab { bottom: 76px; right: 12px; padding: 8px 12px 8px 8px; }
   .guide-fab .fab-full { display: none; }
   .main { padding-bottom: 140px; }

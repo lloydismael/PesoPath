@@ -2,6 +2,27 @@
 const DebtEngine = (() => {
   const MAX_MONTHS = 600;
 
+  function estimateApr(balance, payment, months) {
+    if (!Number.isFinite(balance) || balance <= 0 || !Number.isFinite(payment) || payment <= 0 ||
+        !Number.isInteger(months) || months < 1 || months > MAX_MONTHS) return null;
+    const total = payment * months;
+    if (!Number.isFinite(total)) return null;
+    if (Math.abs(total - balance) <= Math.max(total, balance) * Number.EPSILON) return 0;
+    if (total < balance) return null;
+
+    // Solve for the monthly rate that discounts the remaining payments to the balance.
+    const target = balance / payment;
+    let low = 0, high = 1 / target;
+    if (!Number.isFinite(high)) return null;
+    for (let i = 0; i < 64; i++) {
+      const rate = low + (high - low) / 2;
+      const factor = -Math.expm1(-months * Math.log1p(rate)) / rate;
+      if (factor > target) low = rate; else high = rate;
+    }
+    const apr = (low + (high - low) / 2) * 1200;
+    return Number.isFinite(apr) ? Number(apr.toFixed(2)) : null;
+  }
+
   function order(debts, strategy, customOrder = []) {
     const list = debts.filter((d) => d.balance > 0).slice();
     if (strategy === 'snowball') return list.sort((a, b) => a.balance - b.balance || b.apr - a.apr);
@@ -47,6 +68,6 @@ const DebtEngine = (() => {
     return { level: 'green', label: 'Stable', cls: 'ok' };
   }
 
-  return { order, simulate, baseline, monthLabel, flag };
+  return { MAX_MONTHS, estimateApr, order, simulate, baseline, monthLabel, flag };
 })();
 if (typeof module !== 'undefined') module.exports = DebtEngine;

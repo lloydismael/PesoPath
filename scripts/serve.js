@@ -4,6 +4,8 @@ const path = require('path');
 
 const root = path.resolve(__dirname, '..');
 const port = Number(process.env.PORT) || 5173;
+const WEB_FILES = new Set(['index.html', 'manifest.json', 'sw.js', 'sample-bank-statement.csv']);
+const WEB_DIRS = new Set(['css', 'js', 'icons', 'downloads']);
 
 const MIME = {
   '.html': 'text/html; charset=utf-8',
@@ -27,6 +29,13 @@ const server = http.createServer((req, res) => {
   if (!filePath.startsWith(root + path.sep)) {
     res.writeHead(403, { 'Content-Type': 'text/plain; charset=utf-8' });
     res.end('Forbidden');
+    return;
+  }
+
+  const [entry, child] = path.relative(root, filePath).split(path.sep);
+  if (!(child ? WEB_DIRS : WEB_FILES).has(entry)) {
+    res.writeHead(404, { 'Content-Type': 'text/plain; charset=utf-8' });
+    res.end('Not found');
     return;
   }
 

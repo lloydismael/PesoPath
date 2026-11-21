@@ -1,5 +1,5 @@
 /* PesoPath — service worker (offline app shell) */
-const VERSION = '1.2.3';
+const VERSION = '1.2.5';
 const CACHE = `pesopath-${VERSION}`;
 
 const SHELL = [
